@@ -1,0 +1,48 @@
+{
+  "extends": [
+    "tslint:latest"
+  ],
+  "rules": {
+    "array-type": [
+      false
+    ],
+    "forin": false,
+    "arrow-parens": false,
+    "curly": false,
+    "member-access": [
+      false
+    ],
+    "quotemark": [
+      true,
+      "single",
+      "jsx-double"
+    ],
+    "max-line-length": [
+      false
+    ],
+    "no-consecutive-blank-lines": [
+      true,
+      2
+    ],
+    "eofline": false,
+    "object-literal-sort-keys": false,
+    "one-line": [
+      false
+    ],
+    "ordered-imports": [
+      false
+    ],
+    "trailing-comma": [
+      false
+    ],
+    "variable-name": [
+      true,
+      "allow-leading-underscore",
+      "ban-keywords",
+      "check-format"
+    ],
+    "no-var-requires": false,
+    "semicolon": [true, "never"],
+    "switch-default": false
+  }
+}

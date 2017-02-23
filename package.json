@@ -1,0 +1,49 @@
+{
+  "name": "redux-handler",
+  "version": "0.1.0",
+  "description": "Redux reduce boilerplate library",
+  "main": "dist/index.js",
+  "typings": "dist/index",
+  "dependencies": {},
+  "devDependencies": {
+    "@types/jest": "^18.1.1",
+    "jest": "^19.0.1",
+    "npm-run-all": "^4.0.2",
+    "redux": "^3.6.0",
+    "rimraf": "^2.6.0",
+    "ts-jest": "^19.0.0",
+    "tslint": "^4.4.2",
+    "typescript": "^2.2.1"
+  },
+  "peerDependencies": {
+    "redux": "^3.6.0"
+  },
+  "scripts": {
+    "test": "jest",
+    "build": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mc-petry/redux-handler.git"
+  },
+  "keywords": [
+    "redux"
+  ],
+  "author": "mc-petry",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mc-petry/redux-handler/issues"
+  },
+  "homepage": "https://github.com/mc-petry/redux-handler#readme",
+  "jest": {
+    "transform": {
+      ".(ts|tsx)": "<rootDir>/node_modules/ts-jest/preprocessor.js"
+    },
+    "testRegex": "(\\.test\\.(ts))$",
+    "moduleFileExtensions": [
+      "ts",
+      "tsx",
+      "js"
+    ]
+  }
+}
