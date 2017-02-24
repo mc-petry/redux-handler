@@ -15,7 +15,9 @@ const syncAction = handler.sync('KEY', s => ({ ...s, name: 'test' }))
 ### Async action
 
 ```ts
-const asyncAction = handler.async('KEY', (args: { name: string } => Promise.resolve(args.name)), {
+const asyncAction = handler.async({
+  type: 'KEY',
+  promise: (args: { name: string }) => Promise.resolve(args.name),
   pending: s => ({ ...s, loading: true }),
   then: (s, a) => ({ ...s, name: a.payload }),
   catch: s => ({ ...s, data: undefined })

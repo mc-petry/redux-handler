@@ -39,6 +39,8 @@ export interface IMetaAction<M> extends IAction {
 }
 
 export interface IOptions<TStore, S, R, M> {
+  type: string
+
   pending?: ActionHandler<S, { promise: PromiseLike<R> } & IMetaAction<M>>
   then?: ActionHandler<S, { payload: R } & IMetaAction<M>>
   catch?: ActionHandler<S, { payload: Error } & IMetaAction<M>>
@@ -69,10 +71,10 @@ export class Handler<TStore, TState> {
     return (payload?: any) => ({ type, payload })
   }
 
-  async<T, P extends PromiseLike<T>, M>(type: string, promise: () => P & PromiseLike<T>, options: IOptions<TStore, TState, T, M>): () => IAsyncAction<T, M>
-  async<T, P extends PromiseLike<T>, M, A>(type: string, promise: (args: A) => P & PromiseLike<T>, options: IOptions<TStore, TState, T, M>): (args: A) => IAsyncAction<T, M>
-  async<T, M>(type: string, promise: (args?: any) => PromiseLike<T>, options: IOptions<TStore, TState, T, M>) {
-    this._actionHandlers[this.getActionType(type)] = (state, action: IAsyncActionLifecycle<T, M, TStore>) => {
+  async<T, P extends PromiseLike<T>, M>(options: IOptions<TStore, TState, T, M> & { promise: () => P & PromiseLike<T> }): () => IAsyncAction<T, M>
+  async<T, P extends PromiseLike<T>, M, A>(options: IOptions<TStore, TState, T, M> & { promise: (args: A) => P & PromiseLike<T> }): (args: A) => IAsyncAction<T, M>
+  async<T, M>(options: IOptions<TStore, TState, T, M> & { promise: (args?: any) => PromiseLike<T> }) {
+    this._actionHandlers[this.getActionType(options.type)] = (state, action: IAsyncActionLifecycle<T, M, TStore>) => {
       switch (action.__state) {
         case Lifecycle.Pending:
           state = this.callHandlers([options.pending], state, action)
@@ -92,10 +94,10 @@ export class Handler<TStore, TState> {
       return state
     }
     return (args?: any): IAsyncActionLifecycle<T, M, TStore> => ({
-      type,
-      promise,
-      args,
+      type: options.type,
+      promise: options.promise,
       meta: options.meta,
+      args,
       __state: Lifecycle.Pending,
       __shouldCall: options.shouldCall
     })
