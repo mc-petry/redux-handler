@@ -10,9 +10,10 @@ export interface ILibraryStore {
   data?: string[]
   loading?: boolean
   const: string
+  corp: string[]
 }
 
-const handler = new Handler<IStore, ILibraryStore>({ const: 'INIT' }, { prefix: 'library' })
+const handler = new Handler<IStore, ILibraryStore>({ const: 'INIT', corp: null }, { prefix: 'library' })
 
 export const setDefaultName = handler.sync('SET_DEFAULT_NAME', state => ({ ...state, name: DEFAULT_NAME }))
 export const setName = handler.sync<{ name: string }>('SET_CUSTOM_NAME', (state, action) => ({ ...state, name: action.payload.name }))
@@ -29,7 +30,7 @@ export const getName = handler.async({
   type: 'GET_CUSTOM_NAME',
   promise: (args: { corp: string[] }) => Promise.resolve(args.corp).then(x => x.join('')),
   pending: state => ({ ...state, loading: true }),
-  then: (state, a) => ({ ...state, name: a.payload }),
+  then: (state, a) => ({ ...state, name: a.payload, corp: a.args.corp }),
   finally: state => ({ ...state, loading: false })
 })
 

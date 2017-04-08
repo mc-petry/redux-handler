@@ -1,4 +1,4 @@
-import { CUSTOM_NAME, DEFAULT_NAME, getDefaultName, getName, getCatch, setDefaultName, setName, shouldNotBeCalled } from './modules/library';
+import { CUSTOM_NAME, DEFAULT_NAME, getDefaultName, getName, getCatch, setDefaultName, setName, shouldNotBeCalled } from './modules/library'
 import { store } from './store'
 
 test('sync actions without params', () => {
@@ -26,6 +26,7 @@ test('async actions with params', () =>
     .then(value => {
       expect(value).toBe('Dimon')
       expect(store.getState().library.name).toBe(value)
+      expect(store.getState().library.corp.length === 5).toBeTruthy()
       expect(store.getState().library.loading).toBeFalsy()
     }))
 

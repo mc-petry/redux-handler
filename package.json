@@ -1,6 +1,6 @@
 {
   "name": "redux-handler",
-  "version": "0.2.0",
+  "version": "0.2.5",
   "description": "Redux reduce boilerplate library",
   "main": "dist/index.js",
   "typings": "dist/index",
@@ -20,7 +20,9 @@
   },
   "scripts": {
     "test": "jest",
-    "build": "tsc"
+    "build": "tsc",
+    "clean": "rimraf dist",
+    "prepublish": "run-s clean build"
   },
   "repository": {
     "type": "git",

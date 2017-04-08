@@ -3,7 +3,7 @@ import { IAsyncActionLifecycle, Lifecycle } from './handler'
 
 export const handlerMiddleware: Middleware = <S>({ dispatch, getState }: MiddlewareAPI<S>) =>
   (next: Dispatch<S>) =>
-    (action: IAsyncActionLifecycle<any, any, any>) =>
+    (action: IAsyncActionLifecycle<any, any, any, any>) =>
       typeof action.__shouldCall === 'function' && !action.__shouldCall(getState())
         ? Promise.resolve()
         : action.promise
@@ -26,6 +26,6 @@ export const handlerMiddleware: Middleware = <S>({ dispatch, getState }: Middlew
                 payload: error,
                 error: true
               })
-              return error
+              throw error
             })
           : next(action)

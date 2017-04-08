@@ -2,7 +2,7 @@ import { Action, Reducer } from 'redux'
 
 declare module 'redux' {
   export interface Dispatch<S> {
-    <T, P extends PromiseLike<T>, M>(action: IAsyncAction<T, M>): P
+    <T, P extends PromiseLike<T>, M, A>(action: IAsyncAction<T, M, A>): P
   }
 }
 
@@ -15,8 +15,8 @@ export interface ISyncAction<T> extends IAction {
   payload: T
 }
 
-export interface IAsyncAction<T, M> extends IAction {
-  args?: any
+export interface IAsyncAction<T, M, A> extends IAction {
+  args?: A
   promise?: (args?: any) => PromiseLike<T>
   meta?: M
 }
@@ -27,24 +27,25 @@ export enum Lifecycle {
   Rejected
 }
 
-export interface IAsyncActionLifecycle<T, M, TStore> extends IAsyncAction<T, M> {
+export interface IAsyncActionLifecycle<T, M, A, TStore> extends IAsyncAction<T, M, A> {
   __state: Lifecycle
   __shouldCall?: (state: TStore) => boolean
 }
 
 export type ActionHandler<S, A> = (state: S, action: A) => S
 
-export interface IMetaAction<M> extends IAction {
+export interface IMetaAction<M, A> extends IAction {
   meta?: M
+  args?: A
 }
 
-export interface IOptions<TStore, S, R, M> {
+export interface IOptions<TStore, S, R, M, A> {
   type: string
 
-  pending?: ActionHandler<S, { promise: PromiseLike<R> } & IMetaAction<M>>
-  then?: ActionHandler<S, { payload: R } & IMetaAction<M>>
-  catch?: ActionHandler<S, { payload: Error } & IMetaAction<M>>
-  finally?: ActionHandler<S, { payload: R | Error } & IMetaAction<M>>
+  pending?: ActionHandler<S, { promise: PromiseLike<R> } & IMetaAction<M, A>>
+  then?: ActionHandler<S, { payload: R } & IMetaAction<M, A>>
+  catch?: ActionHandler<S, { payload: Error } & IMetaAction<M, A>>
+  finally?: ActionHandler<S, { payload: R | Error } & IMetaAction<M, A>>
 
   meta?: M
   shouldCall?: (state: TStore) => boolean
@@ -71,10 +72,10 @@ export class Handler<TStore, TState> {
     return (payload?: any) => ({ type, payload })
   }
 
-  async<T, P extends PromiseLike<T>, M>(options: IOptions<TStore, TState, T, M> & { promise: () => P & PromiseLike<T> }): () => IAsyncAction<T, M>
-  async<T, P extends PromiseLike<T>, M, A>(options: IOptions<TStore, TState, T, M> & { promise: (args: A) => P & PromiseLike<T> }): (args: A) => IAsyncAction<T, M>
-  async<T, M>(options: IOptions<TStore, TState, T, M> & { promise: (args?: any) => PromiseLike<T> }) {
-    this._actionHandlers[this.getActionType(options.type)] = (state, action: IAsyncActionLifecycle<T, M, TStore>) => {
+  async<T, P extends PromiseLike<T>, M>(options: IOptions<TStore, TState, T, M, void> & { promise: () => P & PromiseLike<T> }): () => IAsyncAction<T, M, void>
+  async<T, P extends PromiseLike<T>, M, A>(options: IOptions<TStore, TState, T, M, A> & { promise: (args: A) => P & PromiseLike<T> }): (args: A) => IAsyncAction<T, M, A>
+  async<T, M, A>(options: IOptions<TStore, TState, T, M, A> & { promise: (args?: A) => PromiseLike<T> }) {
+    this._actionHandlers[this.getActionType(options.type)] = (state, action: IAsyncActionLifecycle<T, M, A, TStore>) => {
       switch (action.__state) {
         case Lifecycle.Pending:
           state = this.callHandlers([options.pending], state, action)
@@ -93,7 +94,7 @@ export class Handler<TStore, TState> {
 
       return state
     }
-    return (args?: any): IAsyncActionLifecycle<T, M, TStore> => ({
+    return (args?: any): IAsyncActionLifecycle<T, M, A, TStore> => ({
       type: options.type,
       promise: options.promise,
       meta: options.meta,
@@ -108,6 +109,10 @@ export class Handler<TStore, TState> {
       this._actionHandlers[this.getActionType(action.type)]
         ? this._actionHandlers[this.getActionType(action.type)](state, action)
         : state
+  }
+
+  hasHandler(type: string) {
+    return this._actionHandlers[this.getActionType(type)] !== undefined
   }
 
   private callHandlers<TState>(handlers: (ActionHandler<TState, Action> | undefined)[], state: TState, action: Action) {
