@@ -18,13 +18,14 @@ const handler = new Handler<LibraryStore>({ const: 'INIT', corp: null }, { prefi
 export const setDefaultName = handler.action('SET_DEFAULT_NAME', state => ({ ...state, name: DEFAULT_NAME }))
 export const setName = handler.action<{ name: string }>('SET_CUSTOM_NAME', (state, action) => ({ ...state, name: action.payload.name }))
 
-export const getDefaultName = handler
+export const getDefaultNameChain = handler
   .promise('GET_DEFAULT_NAME')
   .call(a => Promise.resolve('Lisa'))
   .pending(state => ({ ...state, loading: true }))
   .fulfilled((state, a) => ({ ...state, name: a.payload }))
   .finally((state, a) => ({ ...state, loading: false }))
-  .build()
+
+export const getDefaultName = getDefaultNameChain.build()
 
 export const getName = handler
   .promise<{ corp: string[] }>('GET_CUSTOM_NAME')

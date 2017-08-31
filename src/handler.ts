@@ -86,15 +86,16 @@ enum HandlerType {
 }
 
 class HandlerChain<TState, TArgs, TResult, TAction> implements HandlerChainInterface<TState, TArgs, TResult, TAction> {
+  private _isBuilt: boolean
   private _promiseAction: PromiseFn<TArgs, any>
   private _pending: ActionHandler<any, any>[] = []
   private _fulfilled: ActionHandler<any, any>[] = []
   private _rejected: ActionHandler<any, any>[] = []
 
   constructor(private _handler: HandlerData, public type: string, public hType: HandlerType) {
-    if (this._handler.actionHandlers[this.type]) {
-      throw new Error(`Action "${this.type}" with the same name already exists`)
-    }
+    if (process.env.NODE_ENV !== 'production')
+      if (this._handler.actionHandlers[this.type])
+        throw new Error(`Action "${this.type}" with the same name already exists`)
 
     this._handler.actionHandlers[this.type] = (state, action: ActionSystem) => {
       switch (action.__state) {
@@ -161,6 +162,12 @@ class HandlerChain<TState, TArgs, TResult, TAction> implements HandlerChainInter
   }
 
   build(): TAction & ActionType {
+    if (process.env.NODE_ENV !== 'production')
+      if (this._isBuilt)
+        throw new Error(`Chain already built. Check type "${this.type}"`)
+
+    this._isBuilt = true
+
     // tslint:disable-next-line:no-object-literal-type-assertion
     const action = (args?: any) => ({
       type: this.type,
@@ -198,7 +205,7 @@ export class Handler<TState> {
   handle<A extends AnyAction>(type: string, handler: ActionHandler<TState, A>): void
   handle(fn: (() => Action) & ActionType, handler: ActionHandler<TState, Action>): void
   handle<T>(fn: ((args: any) => SyncAction<T>) & ActionType, handler: ActionHandler<TState, SyncAction<T>>): void
-  handle<TRefState, TArgs, TMeta, TResult, TAction>(chain: HandlerChainInterface<TRefState, TArgs, TResult, TAction>): HandlerChainInterface<TRefState, TArgs, TResult, TAction>
+  handle<TRefState, TArgs, TMeta, TResult, TAction>(chain: HandlerChainInterface<TRefState, TArgs, TResult, TAction>): HandlerChainInterface<TState, TArgs, TResult, TAction>
   handle(typeOrChain: string | HandlerChainInterface<TState> | ActionType, handler?: ActionHandler<TState, any>) {
     if (typeof typeOrChain === 'string') {
       this._data.actionHandlers[typeOrChain] = handler!
