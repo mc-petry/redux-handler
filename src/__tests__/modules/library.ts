@@ -1,53 +1,46 @@
 import { Handler } from '../../'
-import { IStore } from '../store'
+import { Store } from '../store'
 
 export const DEFAULT_NAME = 'Jesica'
 export const CUSTOM_NAME = 'Veronica'
 
-export interface ILibraryStore {
+export interface LibraryStore {
   name?: string
-  userId?: number
+  name2?: string
   data?: string[]
   loading?: boolean
   const: string
   corp: string[]
 }
 
-const handler = new Handler<IStore, ILibraryStore>({ const: 'INIT', corp: null }, { prefix: 'library' })
+const handler = new Handler<LibraryStore>({ const: 'INIT', corp: null }, { prefix: 'library' })
 
-export const setDefaultName = handler.sync('SET_DEFAULT_NAME', state => ({ ...state, name: DEFAULT_NAME }))
-export const setName = handler.sync<{ name: string }>('SET_CUSTOM_NAME', (state, action) => ({ ...state, name: action.payload.name }))
-export const getDefaultName = handler.async({
-  type: 'GET_DEFAULT_NAME',
-  promise: () => Promise.resolve('Lisa'),
-  pending: state => ({ ...state, loading: true }),
-  then: (state, a) => ({ ...state, name: a.payload, userId: a.meta.userId }),
-  finally: state => ({ ...state, loading: false }),
-  meta: { userId: 25 }
-})
+export const setDefaultName = handler.action('SET_DEFAULT_NAME', state => ({ ...state, name: DEFAULT_NAME }))
+export const setName = handler.action<{ name: string }>('SET_CUSTOM_NAME', (state, action) => ({ ...state, name: action.payload.name }))
 
-export const getName = handler.async({
-  type: 'GET_CUSTOM_NAME',
-  promise: (args: { corp: string[] }) => Promise.resolve(args.corp).then(x => x.join('')),
-  pending: state => ({ ...state, loading: true }),
-  then: (state, a) => ({ ...state, name: a.payload, corp: a.args.corp }),
-  finally: state => ({ ...state, loading: false })
-})
+export const getDefaultName = handler
+  .promise('GET_DEFAULT_NAME')
+  .call(a => Promise.resolve('Lisa'))
+  .pending(state => ({ ...state, loading: true }))
+  .fulfilled((state, a) => ({ ...state, name: a.payload }))
+  .finally((state, a) => ({ ...state, loading: false }))
+  .build()
 
-export const getCatch = handler.async({
-  type: 'GET_ERROR',
-  promise: () => Promise.resolve()
-    .then<Error>(() => { throw new Error() }),
-  pending: state => ({ ...state, loading: true }),
-  catch: state => ({ ...state, name: '[Rejected]' }),
-  finally: state => ({ ...state, loading: false })
-})
+export const getName = handler
+  .promise<{ corp: string[] }>('GET_CUSTOM_NAME')
+  .call(a => Promise.resolve(a.corp).then(x => ({ name: x.join('') })))
+  .pending(state => ({ ...state, loading: true }))
+  .fulfilled((state, a) => ({ ...state, name: a.payload.name, corp: a.args.corp }))
+  .finally(state => ({ ...state, loading: false }))
+  .build()
 
-export const shouldNotBeCalled = handler.async({
-  type: 'PREVENTED',
-  promise: () => Promise.resolve(),
-  then: state => ({ ...state, const: '55' }),
-  shouldCall: store => store.library.const !== 'INIT'
-})
+export const getCatch = handler
+  .promise('GET_ERROR')
+  .call(() => Promise.resolve()
+    .then<Error>(() => { throw new Error() }))
+  .pending(state => ({ ...state, loading: true }))
+  .rejected(state => ({ ...state, name: '[Rejected]' }))
+  .finally(state => ({ ...state, loading: false }))
+  .build()
 
-export const library = handler.toReducer()
+export const lib = handler.buildReducer()

@@ -1,28 +1,30 @@
 {
   "name": "redux-handler",
-  "version": "0.2.5",
+  "version": "0.4.0",
   "description": "Redux reduce boilerplate library",
   "main": "dist/index.js",
   "typings": "dist/index",
   "dependencies": {},
   "devDependencies": {
-    "@types/jest": "^18.1.1",
-    "jest": "^19.0.1",
-    "npm-run-all": "^4.0.2",
-    "redux": "^3.6.0",
-    "rimraf": "^2.6.0",
-    "ts-jest": "^19.0.0",
-    "tslint": "^4.4.2",
-    "typescript": "^2.2.1"
+    "@types/jest": "^20.0.8",
+    "jest": "^20.0.4",
+    "npm-run-all": "^4.1.1",
+    "redux": "^3.7.2",
+    "rimraf": "^2.6.1",
+    "rxjs": "^5.4.3",
+    "ts-jest": "^20.0.11",
+    "tslint": "^5.7.0",
+    "typescript": "^2.4.2"
   },
   "peerDependencies": {
-    "redux": "^3.6.0"
+    "redux": "^3.7.2"
   },
   "scripts": {
     "test": "jest",
     "build": "tsc",
     "clean": "rimraf dist",
-    "prepublish": "run-s clean build"
+    "prepare": "run-s clean build",
+    "watch": "tsc -w"
   },
   "repository": {
     "type": "git",

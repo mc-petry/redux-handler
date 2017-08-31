@@ -1,13 +1,16 @@
 import { createStore, combineReducers, applyMiddleware, Reducer } from 'redux'
 import { handlerMiddleware } from '../'
-import { ILibraryStore, library } from './modules/library'
+import { LibraryStore, lib } from './modules/library'
+import { Lib2Store, lib2 } from './modules/library2'
 
-export interface IStore {
-  library: ILibraryStore
+export interface Store {
+  lib: LibraryStore
+  lib2: Lib2Store
 }
 
-const reducers: {[P in keyof IStore]: Reducer<IStore[P]> } = {
-  library
+const reducers: {[P in keyof Store]: Reducer<Store[P]> } = {
+  lib,
+  lib2
 }
 
-export const store = createStore(combineReducers<IStore>(reducers), applyMiddleware(handlerMiddleware))
+export const store = createStore(combineReducers<Store>(reducers), applyMiddleware(handlerMiddleware))

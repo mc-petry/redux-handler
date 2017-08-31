@@ -1,16 +1,12 @@
 import { Dispatch, Middleware, MiddlewareAPI } from 'redux'
-import { IAsyncActionLifecycle, Lifecycle } from './handler'
+import { ActionSystem, Lifecycle } from './handler'
 
-export const handlerMiddleware: Middleware = <S>({ dispatch, getState }: MiddlewareAPI<S>) =>
+export const handlerMiddleware: Middleware = <S>({ dispatch }: MiddlewareAPI<S>) =>
   (next: Dispatch<S>) =>
-    (action: IAsyncActionLifecycle<any, any, any, any>) =>
-      typeof action.__shouldCall === 'function' && !action.__shouldCall(getState())
-        ? Promise.resolve()
-        : action.promise
-          && typeof action.promise === 'function'
-          && action.__state === Lifecycle.Pending
-
-          ? action.promise(action.args).then(
+    (action: ActionSystem) => {
+      if (action.__state === Lifecycle.Pending) {
+        if (action.promise && typeof action.promise === 'function') {
+          return action.promise(action.args).then(
             payload => {
               dispatch({
                 ...action,
@@ -26,6 +22,10 @@ export const handlerMiddleware: Middleware = <S>({ dispatch, getState }: Middlew
                 payload: error,
                 error: true
               })
-              throw error
+              return error
             })
-          : next(action)
+        }
+      }
+
+      return next(action)
+    }

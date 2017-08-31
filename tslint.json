@@ -17,6 +17,10 @@
       "single",
       "jsx-double"
     ],
+    "interface-name": [
+      true,
+      "never-prefix"
+    ],
     "max-line-length": [
       false
     ],
@@ -42,7 +46,10 @@
       "check-format"
     ],
     "no-var-requires": false,
-    "semicolon": [true, "never"],
+    "semicolon": [
+      true,
+      "never"
+    ],
     "switch-default": false
   }
 }
