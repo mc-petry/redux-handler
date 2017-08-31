@@ -83,8 +83,6 @@ const getName = handler
 ### Handle action in another handler
 
 ```ts
-const getNameChain = getName = handler.action("TEST", s => ({ ...s }))
-
 const setDefaultName = handler1.action('SET_DEFAULT_NAME', s => ({ ...s, name: 'default' }))
 const setName = handler1.action<{ name: string }>('SET_CUSTOM_NAME', (s, a) => ({ ...s, name: action.payload.name }))
 
