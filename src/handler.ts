@@ -117,18 +117,20 @@ class HandlerChain<TState, TArgs, TResult, TAction> implements HandlerChainInter
   }
 
   call<P>(observableOrPromise: PromiseFn<TArgs, P> | ObservableFn<TArgs, P>): HandlerChainInterface<TState, TArgs, P, TAction> {
-
     if (this.hType === HandlerType.Observable) {
       let args: TArgs
       const observablePending = (action$: Observable<ActionSystem>) =>
-        (observableOrPromise as ObservableFn<TArgs, P>)(
+        (observableOrPromise as ObservableFn<TArgs, P | Action>)(
           action$.filter(action => action.type === this.type && action.__state === Lifecycle.Pending)
             .map(x => {
               args = x.args
               return x.args
             })
         )
-          .map(payload => ({ type: this.type, __state: Lifecycle.Fulfilled, payload, args }))
+          .map(payload =>
+            (payload as Action).type
+              ? payload
+              : ({ type: this.type, __state: Lifecycle.Fulfilled, payload, args }))
           .catch(error => Observable.of({ type: this.type, ___state: Lifecycle.Rejected, payload: error, error: true }))
 
       this._handler.epics.push(observablePending)
@@ -235,13 +237,17 @@ export class Handler<TState> {
   }
 
   promise(type: string): HandlerChainPromise<TState, never, () => PromiseAction<any, {}> & Action & ActionType>
-  promise<A>(type: string): HandlerChainPromise<TState, A, (args: A) => PromiseAction<any, A> & ArgsAction<A> & ActionType>
+  promise<A extends {}>(type: string): HandlerChainPromise<TState, A, (args: A) => PromiseAction<any, A> & ArgsAction<A> & ActionType>
   promise(type: string): HandlerChainPromise<TState, any, any> {
     return new HandlerChain(this._data, this.getActionType(type), HandlerType.Promise)
   }
 
+  /**
+   * Handles items from observable stream except actions.
+   * `{ type: string }` items will be skipped.
+   */
   observable(type: string): HandlerChainObservable<TState, any, () => Action & ActionType>
-  observable<A>(type: string): HandlerChainObservable<TState, A, (args: A) => ArgsAction<A> & ActionType>
+  observable<A extends {}>(type: string): HandlerChainObservable<TState, A, (args: A) => ArgsAction<A> & ActionType>
   observable(type: string): HandlerChainObservable<TState, any, any> {
     return new HandlerChain(this._data, this.getActionType(type), HandlerType.Observable)
   }
