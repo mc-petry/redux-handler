@@ -1,12 +1,13 @@
 // tslint:disable:unified-signatures
 
 import { Action, Reducer, AnyAction } from 'redux'
-import { Observable } from 'rxjs'
+import { Observable, Subscription } from 'rxjs'
 
 declare module 'redux' {
   interface Dispatch<S> {
     // tslint:disable-next-line:callable-types
     <T, P extends PromiseLike<T>, A>(action: PromiseAction<T, A>): P
+    <T, P extends Subscription, A>(action: ObservableAction<T, A>): P
   }
 }
 
@@ -24,10 +25,15 @@ export interface ArgsAction<A> extends Action {
 }
 
 export interface PromiseAction<T, A> {
-  promise?: (args?: A) => PromiseLike<T>
+  promise?: PromiseFn<T, A>
+}
+
+export interface ObservableAction<T, A> {
+  observable?: ObservableFn<T, A>
 }
 
 export enum Lifecycle {
+  Init,
   Pending,
   Fulfilled,
   Rejected
@@ -35,7 +41,9 @@ export enum Lifecycle {
 
 export interface ActionSystem extends ArgsAction<any> {
   promise?: PromiseFn
+  observable?: ObservableFn
   __state: Lifecycle
+  __rejected: boolean
 }
 
 export type ActionHandler<S, A> = (state: S, action: A) => S
@@ -57,12 +65,11 @@ const callHandlers = <TState>(handlers: (ActionHandler<TState, Action> | undefin
 }
 
 export interface HandlerData {
-  epics: ((action$: Observable<any>) => any)[]
   actionHandlers: { [id: string]: ActionHandler<any, any> }
 }
 
 export type PromiseFn<A = any, T = any> = (args: A) => PromiseLike<T>
-export type ObservableFn<A = any, T = any> = (action$: Observable<A>) => Observable<T>
+export type ObservableFn<A = any, T = any> = (args: A, action$: Observable<Action>) => Observable<T>
 
 export interface HandlerChainObservable<TState, TArgs, TAction> {
   call<TPayload>(observable$: ObservableFn<TArgs, TPayload>): HandlerChainInterface<TState, TArgs, TPayload, TAction>
@@ -87,7 +94,8 @@ enum HandlerType {
 
 class HandlerChain<TState, TArgs, TResult, TAction> implements HandlerChainInterface<TState, TArgs, TResult, TAction> {
   private _isBuilt: boolean
-  private _promiseAction: PromiseFn<TArgs, any>
+  private _promiseFn: PromiseFn<TArgs, any>
+  private _observableFn: ObservableFn<TArgs, any>
   private _pending: ActionHandler<any, any>[] = []
   private _fulfilled: ActionHandler<any, any>[] = []
   private _rejected: ActionHandler<any, any>[] = []
@@ -118,25 +126,10 @@ class HandlerChain<TState, TArgs, TResult, TAction> implements HandlerChainInter
 
   call<P>(observableOrPromise: PromiseFn<TArgs, P> | ObservableFn<TArgs, P>): HandlerChainInterface<TState, TArgs, P, TAction> {
     if (this.hType === HandlerType.Observable) {
-      let args: TArgs
-      const observablePending = (action$: Observable<ActionSystem>) =>
-        (observableOrPromise as ObservableFn<TArgs, P | Action>)(
-          action$.filter(action => action.type === this.type && action.__state === Lifecycle.Pending)
-            .map(x => {
-              args = x.args
-              return x.args
-            })
-        )
-          .map(payload =>
-            (payload as Action).type
-              ? payload
-              : ({ type: this.type, __state: Lifecycle.Fulfilled, payload, args }))
-          .catch(error => Observable.of({ type: this.type, ___state: Lifecycle.Rejected, payload: error, error: true }))
-
-      this._handler.epics.push(observablePending)
+      this._observableFn = observableOrPromise as ObservableFn
     }
     else if (this.hType === HandlerType.Promise) {
-      this._promiseAction = observableOrPromise as PromiseFn<TArgs, P>
+      this._promiseFn = observableOrPromise as PromiseFn<TArgs, P>
     }
 
     return this as any
@@ -171,12 +164,21 @@ class HandlerChain<TState, TArgs, TResult, TAction> implements HandlerChainInter
     this._isBuilt = true
 
     // tslint:disable-next-line:no-object-literal-type-assertion
-    const action = (args?: any) => ({
-      type: this.type,
-      args,
-      promise: this._promiseAction,
-      __state: Lifecycle.Pending
-    } as ActionSystem);
+    const action = (args?: any) => {
+      const a: ActionSystem = {
+        type: this.type,
+        args,
+        __state: Lifecycle.Init,
+        __rejected: this._rejected.length > 0
+      }
+
+      if (this._promiseFn)
+        a.promise = this._promiseFn
+      else if (this._observableFn)
+        a.observable = this._observableFn
+
+      return a
+    }
 
     (action as any as ActionType).type = this.type
 
@@ -190,8 +192,7 @@ export class Handler<TState> {
   private readonly _options: HandlerOptions
 
   private readonly _data: HandlerData = {
-    actionHandlers: {},
-    epics: []
+    actionHandlers: {}
   }
 
   constructor(initialState: TState, options: HandlerOptions = {}) {
@@ -246,8 +247,8 @@ export class Handler<TState> {
    * Handles items from observable stream except actions.
    * `{ type: string }` items will be skipped.
    */
-  observable(type: string): HandlerChainObservable<TState, any, () => Action & ActionType>
-  observable<A extends {}>(type: string): HandlerChainObservable<TState, A, (args: A) => ArgsAction<A> & ActionType>
+  observable(type: string): HandlerChainObservable<TState, any, () => ObservableAction<any, {}> & ActionType>
+  observable<A extends {}>(type: string): HandlerChainObservable<TState, A, (args: A) => ObservableAction<any, A> & ActionType>
   observable(type: string): HandlerChainObservable<TState, any, any> {
     return new HandlerChain(this._data, this.getActionType(type), HandlerType.Observable)
   }
@@ -257,10 +258,6 @@ export class Handler<TState> {
       this._data.actionHandlers[action.type]
         ? this._data.actionHandlers[action.type](state, action)
         : state
-  }
-
-  buildEpic() {
-    return (...args: [any, any][]) => Observable.merge(...this._data.epics.map((epic: any) => epic(...args)))
   }
 
   private getActionType(type: string) {

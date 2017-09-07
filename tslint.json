@@ -46,6 +46,7 @@
       "check-format"
     ],
     "no-var-requires": false,
+    "no-submodule-imports": false,
     "semicolon": [
       true,
       "never"
