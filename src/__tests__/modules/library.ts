@@ -26,6 +26,7 @@ export interface LibraryStore {
   multiple3?: boolean
 
   multipleResult: string
+  obsEmptyPayload?: null
 }
 
 const handler = new Handler<LibraryStore>({ const: 'INIT', corp: null, multipleResult: '' }, { prefix: 'library' })
@@ -91,7 +92,7 @@ export const obsCancel = handler.action('TEST_OBS_CANCEL', s => s)
 
 export const obsCancelled = handler
   .observable('TEST_OBS_CANCELLED')
-  .call((_, action$) =>
+  .call((_, { action$ }) =>
     Observable.of({ test: '123' })
       .delay(200)
       .takeUntil(action$.filter(x => x.type === obsCancel.type)))
@@ -111,6 +112,14 @@ export const obsMultipleActions = handler
       .concat(Observable.of({ a1: 'dash' }).delay(10))
       .concat(Observable.of(obsMultiple3()).delay(10)))
   .fulfilled((s, a) => ({ ...s, multipleResult: s.multipleResult + (a.payload as any).a1 }))
+  .build()
+
+export const obsEmptyPayloadAction = handler
+  .observable('TEST_OBS_EMPTY_PAYLOAD')
+  .call(() =>
+    Observable.of({ type: 'test' })
+      .concat(Observable.of(null)))
+  .fulfilled((s, a) => ({ ...s, obsEmptyPayload: a.payload }))
   .build()
 
 export const lib = handler.buildReducer()

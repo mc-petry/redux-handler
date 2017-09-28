@@ -2,34 +2,52 @@ import { Dispatch, Middleware, MiddlewareAPI } from 'redux'
 import { ActionSystem, Lifecycle, Action } from './handler'
 import { Subject } from 'rxjs'
 
-export const handlerMiddleware: Middleware = <S>({ dispatch }: MiddlewareAPI<S>) => {
+export const handlerMiddleware: Middleware = <S>({ dispatch, getState }: MiddlewareAPI<S>) => {
   const action$ = new Subject<Action>()
 
   return (next: Dispatch<S>) =>
     (action: ActionSystem) => {
-      if (action.__state === Lifecycle.Init) {
-        dispatch({
-          ...action,
-          __state: Lifecycle.Pending
-        })
+      if (action.__state === Lifecycle.INIT) {
+        action$.next(next(action) as any)
+
+        if (action.__pending)
+          dispatch({
+            ...action,
+            __state: Lifecycle.Pending
+          })
 
         if (typeof action.promise === 'function') {
           return action.promise(action.args).then(
             payload => {
-              dispatch({
-                ...action,
-                __state: Lifecycle.Fulfilled,
-                payload
-              })
+              if (action.__fulfilled)
+                dispatch({
+                  ...action,
+                  __state: Lifecycle.Fulfilled,
+                  payload
+                })
+
+              if (action.__finally)
+                dispatch({
+                  ...action,
+                  __state: Lifecycle.Finally
+                })
+
               return payload
             },
             error => {
-              dispatch({
-                ...action,
-                __state: Lifecycle.Rejected,
-                payload: error,
-                error: true
-              })
+              if (action.__rejected)
+                dispatch({
+                  ...action,
+                  __state: Lifecycle.Rejected,
+                  payload: error,
+                  error: true
+                })
+
+              if (action.__finally)
+                dispatch({
+                  ...action,
+                  __state: Lifecycle.Finally
+                })
 
               if (!action.__rejected)
                 throw error
@@ -39,11 +57,11 @@ export const handlerMiddleware: Middleware = <S>({ dispatch }: MiddlewareAPI<S>)
         }
 
         if (typeof action.observable === 'function') {
-          const obs = action.observable(action.args, action$)
+          const obs = action.observable(action.args, { action$, getState: getState as any })
             .mergeMap((x: Action) => {
               const payloads: any[] = []
 
-              if (x.type) {
+              if (x && x.type) {
                 dispatch(x)
               }
               else {
@@ -52,13 +70,19 @@ export const handlerMiddleware: Middleware = <S>({ dispatch }: MiddlewareAPI<S>)
 
               return payloads
             })
+            .finally(() => {
+              if (action.__finally)
+                dispatch({
+                  ...action,
+                  __state: Lifecycle.Finally
+                })
+            })
             .subscribe(payload => {
               dispatch({
                 ...action,
                 __state: Lifecycle.Fulfilled,
                 payload
               })
-              return payload
             }, error => {
               dispatch({
                 ...action,
@@ -67,16 +91,11 @@ export const handlerMiddleware: Middleware = <S>({ dispatch }: MiddlewareAPI<S>)
                 error: true
               })
 
-
               if (!action.__rejected) {
                 // tslint:disable-next-line:no-console
                 console.error(error)
               }
-
-              return error
             })
-
-          action$.next(next(action) as any)
 
           return obs
         }

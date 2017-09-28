@@ -33,17 +33,21 @@ export interface ObservableAction<T, A> {
 }
 
 export enum Lifecycle {
-  Init,
-  Pending,
-  Fulfilled,
-  Rejected
+  INIT = 'init',
+  Pending = 'pending',
+  Fulfilled = 'fulfilled',
+  Rejected = 'rejected',
+  Finally = 'finally'
 }
 
 export interface ActionSystem extends ArgsAction<any> {
   promise?: PromiseFn
   observable?: ObservableFn
   __state: Lifecycle
+  __pending: boolean
+  __fulfilled: boolean
   __rejected: boolean
+  __finally: boolean
 }
 
 export type ActionHandler<S, A> = (state: S, action: A) => S
@@ -69,7 +73,7 @@ export interface HandlerData {
 }
 
 export type PromiseFn<A = any, T = any> = (args: A) => PromiseLike<T>
-export type ObservableFn<A = any, T = any> = (args: A, action$: Observable<Action>) => Observable<T>
+export type ObservableFn<A = any, T = any> = (args: A, injects: { action$: Observable<Action>, getState: <S>() => S }) => Observable<T>
 
 export interface HandlerChainObservable<TState, TArgs, TAction> {
   call<TPayload>(observable$: ObservableFn<TArgs, TPayload>): HandlerChainInterface<TState, TArgs, TPayload, TAction>
@@ -99,6 +103,7 @@ class HandlerChain<TState, TArgs, TResult, TAction> implements HandlerChainInter
   private _pending: ActionHandler<any, any>[] = []
   private _fulfilled: ActionHandler<any, any>[] = []
   private _rejected: ActionHandler<any, any>[] = []
+  private _finally: ActionHandler<any, any>[] = []
 
   constructor(private _handler: HandlerData, public type: string, public hType: HandlerType) {
     if (process.env.NODE_ENV !== 'production')
@@ -118,6 +123,9 @@ class HandlerChain<TState, TArgs, TResult, TAction> implements HandlerChainInter
         case Lifecycle.Rejected:
           state = callHandlers(this._rejected, state, action)
           break
+
+        case Lifecycle.Finally:
+          state = callHandlers(this._finally, state, action)
       }
 
       return state
@@ -151,8 +159,7 @@ class HandlerChain<TState, TArgs, TResult, TAction> implements HandlerChainInter
   }
 
   finally(handler: ActionHandler<TState, ArgsAction<TArgs>>): HandlerChainInterface<TState, TArgs, TResult, TAction> {
-    this._fulfilled.push(handler)
-    this._rejected.push(handler)
+    this._finally.push(handler)
     return this
   }
 
@@ -168,8 +175,11 @@ class HandlerChain<TState, TArgs, TResult, TAction> implements HandlerChainInter
       const a: ActionSystem = {
         type: this.type,
         args,
-        __state: Lifecycle.Init,
-        __rejected: this._rejected.length > 0
+        __state: Lifecycle.INIT,
+        __pending: this._pending.length > 0,
+        __fulfilled: this._fulfilled.length > 0,
+        __rejected: this._rejected.length > 0,
+        __finally: this._finally.length > 0
       }
 
       if (this._promiseFn)

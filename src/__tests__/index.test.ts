@@ -1,4 +1,4 @@
-import { CUSTOM_NAME, DEFAULT_NAME, getDefaultName, getName, getCatch, setDefaultName, setName, obs, obsCancelled, obsCancel, obsMultipleActions, obsNotCatched, notCatched } from './modules/library'
+import { CUSTOM_NAME, DEFAULT_NAME, getDefaultName, getName, getCatch, setDefaultName, setName, obs, obsCancelled, obsCancel, obsMultipleActions, obsNotCatched, notCatched, obsEmptyPayloadAction } from './modules/library'
 import { store } from './store'
 import { Observable } from 'rxjs'
 
@@ -87,5 +87,11 @@ describe('observable', () => {
       expect(state.multiple2).toBeTruthy()
       expect(state.multiple3).toBeTruthy()
       expect(state.multipleResult).toBe('Lodash')
+    }))
+
+  test('empty action', () =>
+    new Promise(resolve => store.dispatch(obsEmptyPayloadAction()).add(resolve)).then(() => {
+      const state = store.getState().lib
+      expect(state.obsEmptyPayload).toBeNull()
     }))
 })
