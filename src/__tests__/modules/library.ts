@@ -88,6 +88,12 @@ export const obs = handler
   })
   .build()
 
+export const obsTestHandleChain = handler
+  .observable('TEST_HANDLE_CHAIN')
+  .call(() => Observable.of(null))
+
+export const obsTestHandle = obsTestHandleChain.build()
+
 export const obsCancel = handler.action('TEST_OBS_CANCEL', s => s)
 
 export const obsCancelled = handler

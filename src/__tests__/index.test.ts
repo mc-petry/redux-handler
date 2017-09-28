@@ -1,4 +1,4 @@
-import { CUSTOM_NAME, DEFAULT_NAME, getDefaultName, getName, getCatch, setDefaultName, setName, obs, obsCancelled, obsCancel, obsMultipleActions, obsNotCatched, notCatched, obsEmptyPayloadAction } from './modules/library'
+import { CUSTOM_NAME, DEFAULT_NAME, getDefaultName, getName, getCatch, setDefaultName, setName, obs, obsCancelled, obsCancel, obsMultipleActions, obsNotCatched, notCatched, obsEmptyPayloadAction, obsTestHandle } from './modules/library'
 import { store } from './store'
 import { Observable } from 'rxjs'
 
@@ -93,5 +93,13 @@ describe('observable', () => {
     new Promise(resolve => store.dispatch(obsEmptyPayloadAction()).add(resolve)).then(() => {
       const state = store.getState().lib
       expect(state.obsEmptyPayload).toBeNull()
+    }))
+
+  test('handle', () =>
+    new Promise(resolve => store.dispatch(obsTestHandle()).add(resolve)).then(() => {
+      const state = store.getState().lib2
+      expect(state.obsHandlePending).toBeTruthy()
+      expect(state.obsHandleFulfilled).toBeTruthy()
+      expect(state.obsHandleFinally).toBeTruthy()
     }))
 })
