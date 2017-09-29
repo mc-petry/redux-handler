@@ -78,18 +78,20 @@ export const handlerMiddleware: Middleware = <S>({ dispatch, getState }: Middlew
                 })
             })
             .subscribe(payload => {
-              dispatch({
-                ...action,
-                __state: Lifecycle.Fulfilled,
-                payload
-              })
+              if (action.__fulfilled)
+                dispatch({
+                  ...action,
+                  __state: Lifecycle.Fulfilled,
+                  payload
+                })
             }, error => {
-              dispatch({
-                ...action,
-                __state: Lifecycle.Rejected,
-                payload: error,
-                error: true
-              })
+              if (action.__rejected)
+                dispatch({
+                  ...action,
+                  __state: Lifecycle.Rejected,
+                  payload: error,
+                  error: true
+                })
 
               if (!action.__rejected) {
                 // tslint:disable-next-line:no-console
