@@ -5,6 +5,9 @@ import { Subject } from 'rxjs'
 export const handlerMiddleware: Middleware = <S>({ dispatch, getState }: MiddlewareAPI<S>) => {
   const action$ = new Subject<Action>()
 
+  const promiseInjectors = { getState: getState as any }
+  const observableInjectors = { action$, getState: getState as any }
+
   return (next: Dispatch<S>) =>
     (action: ActionSystem) => {
       if (action.__state === Lifecycle.INIT) {
@@ -17,7 +20,7 @@ export const handlerMiddleware: Middleware = <S>({ dispatch, getState }: Middlew
           })
 
         if (typeof action.promise === 'function') {
-          return action.promise(action.args).then(
+          return action.promise(action.args, promiseInjectors).then(
             payload => {
               if (action.__fulfilled)
                 dispatch({
@@ -57,7 +60,7 @@ export const handlerMiddleware: Middleware = <S>({ dispatch, getState }: Middlew
         }
 
         if (typeof action.observable === 'function') {
-          const obs = action.observable(action.args, { action$, getState: getState as any })
+          const obs = action.observable(action.args, observableInjectors)
             .mergeMap((x: Action) => {
               const payloads: any[] = []
 

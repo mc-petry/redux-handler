@@ -72,17 +72,17 @@ export interface HandlerData {
   actionHandlers: { [id: string]: ActionHandler<any, any> }
 }
 
-export type PromiseFn<A = any, T = any> = (args: A) => PromiseLike<T>
-export type ObservableFn<A = any, T = any> = (args: A, injects: { action$: Observable<Action>, getState: <S>() => S }) => Observable<T>
+export type PromiseFn<TRootState = {}, A = any, T = any> = (args: A, injects: { getState: () => TRootState }) => PromiseLike<T>
+export type ObservableFn<TRootState = {}, A = any, T = any> = (args: A, injects: { action$: Observable<Action>, getState: () => TRootState }) => Observable<T>
 
-type BaseHandlerChain = HandlerChain<any, any, any, any>
+type BaseHandlerChain = HandlerChain<any, any, any, any, any>
 
-export interface HandlerChainObservable<TState, TArgs, TAction extends Action> {
-  call<TPayload>(observable$: ObservableFn<TArgs, TPayload>): HandlerChainInterface<TState, TArgs, TPayload, TAction>
+export interface HandlerChainObservable<TState, TRootState, TArgs, TAction extends Action> {
+  call<TPayload>(observable$: ObservableFn<TRootState, TArgs, TPayload>): HandlerChainInterface<TState, TArgs, TPayload, TAction>
 }
 
-export interface HandlerChainPromise<TState, TArgs, TAction extends Action> {
-  call<TPayload>(fn: PromiseFn<TArgs, TPayload>): HandlerChainInterface<TState, TArgs, TPayload, TAction>
+export interface HandlerChainPromise<TState, TRootState, TArgs, TAction extends Action> {
+  call<TPayload>(fn: PromiseFn<TRootState, TArgs, TPayload>): HandlerChainInterface<TState, TArgs, TPayload, TAction>
 }
 
 /**
@@ -111,13 +111,13 @@ const getRootChain = (parentChain: BaseHandlerChain): BaseHandlerChain =>
     ? getRootChain(parentChain.parentChain)
     : parentChain
 
-class HandlerChain<TState, TArgs, TResult, TAction extends Action> implements HandlerChainInterface<TState, TArgs, TResult, TAction> {
+class HandlerChain<TState, TRootState, TArgs, TResult, TAction extends Action> implements HandlerChainInterface<TState, TArgs, TResult, TAction> {
   parentChain: BaseHandlerChain
   type: string
 
   private _isBuilt: boolean
-  private _promiseFn: PromiseFn<TArgs, any>
-  private _observableFn: ObservableFn<TArgs, any>
+  private _promiseFn: PromiseFn<TRootState, TArgs, any>
+  private _observableFn: ObservableFn<TRootState, TArgs, any>
 
   private _pendingCount: number = 0
   private _fulfilledCount: number = 0
@@ -165,12 +165,12 @@ class HandlerChain<TState, TArgs, TResult, TAction extends Action> implements Ha
     }
   }
 
-  call<P>(observableOrPromise: PromiseFn<TArgs, P> | ObservableFn<TArgs, P>): HandlerChainInterface<TState, TArgs, P, TAction> {
+  call<P>(observableOrPromise: PromiseFn<TRootState, TArgs, P> | ObservableFn<TRootState, TArgs, P>): HandlerChainInterface<TState, TArgs, P, TAction> {
     if (this.hType === HandlerType.Observable) {
-      this._observableFn = observableOrPromise as ObservableFn
+      this._observableFn = observableOrPromise as ObservableFn<TRootState>
     }
     else if (this.hType === HandlerType.Promise) {
-      this._promiseFn = observableOrPromise as PromiseFn<TArgs, P>
+      this._promiseFn = observableOrPromise as PromiseFn<TRootState, TArgs, P>
     }
 
     return this as any
@@ -239,7 +239,7 @@ class HandlerChain<TState, TArgs, TResult, TAction extends Action> implements Ha
 }
 
 // tslint:disable-next-line:max-classes-per-file
-export class Handler<TState> {
+export class Handler<TState, TRootState = {}> {
   private readonly _initialState: TState
   private readonly _options: HandlerOptions
 
@@ -266,7 +266,7 @@ export class Handler<TState> {
     }
     else if (typeof (typeOrChain as HandlerChainInterface<TState>).fulfilled === 'function') {
       const chain = typeOrChain as BaseHandlerChain
-      return new HandlerChain<any, any, any, any>(this._data, chain) as HandlerChainInterface<any, any, any, any>
+      return new HandlerChain<TState, TRootState, any, any, any>(this._data, chain) as HandlerChainInterface<any, any, any, any>
     }
     else {
       this._data.actionHandlers[(typeOrChain as ActionType).type] = handler!
@@ -287,9 +287,9 @@ export class Handler<TState> {
     return modifiedAction
   }
 
-  promise(type: string): HandlerChainPromise<TState, never, (() => PromiseAction<any, {}> & Action) & ActionType>
-  promise<A extends {}>(type: string): HandlerChainPromise<TState, A, ((args: A) => PromiseAction<any, A> & ArgsAction<A>) & ActionType>
-  promise(type: string): HandlerChainPromise<TState, any, any> {
+  promise(type: string): HandlerChainPromise<TState, TRootState, never, (() => PromiseAction<any, {}> & Action) & ActionType>
+  promise<A extends {}>(type: string): HandlerChainPromise<TState, TRootState, A, ((args: A) => PromiseAction<any, A> & ArgsAction<A>) & ActionType>
+  promise(type: string): HandlerChainPromise<TState, TRootState, any, any> {
     return new HandlerChain(this._data, this.getActionType(type), HandlerType.Promise)
   }
 
@@ -297,9 +297,9 @@ export class Handler<TState> {
    * Handles items from observable stream except actions.
    * `{ type: string }` items will be skipped.
    */
-  observable(type: string): HandlerChainObservable<TState, any, (() => ObservableAction<any, {}>) & ActionType>
-  observable<A extends {}>(type: string): HandlerChainObservable<TState, A, ((args: A) => ObservableAction<any, A>) & ActionType>
-  observable(type: string): HandlerChainObservable<TState, any, any> {
+  observable(type: string): HandlerChainObservable<TState, TRootState, any, (() => ObservableAction<any, {}>) & ActionType>
+  observable<A extends {}>(type: string): HandlerChainObservable<TState, TRootState, A, ((args: A) => ObservableAction<any, A>) & ActionType>
+  observable(type: string): HandlerChainObservable<TState, TRootState, any, any> {
     return new HandlerChain(this._data, this.getActionType(type), HandlerType.Observable)
   }
 
