@@ -1,5 +1,3 @@
-// tslint:disable:unified-signatures
-
 import { Action, Reducer, AnyAction } from 'redux'
 import { Observable, Subscription } from 'rxjs'
 
@@ -50,17 +48,17 @@ export interface ActionSystem extends ArgsAction<any> {
   __finally: boolean
 }
 
-export type ActionHandler<S, A> = (state: S, action: A) => S
+export type ActionHandler<S, A, K extends keyof S> = (state: Readonly<S>, action: A) => Pick<S, K>
 
 export interface HandlerOptions {
-  prefix?: string
+  prefix?: string | string[]
 }
 
 export interface ActionType {
   type: string
 }
 
-const callHandlers = <TState>(handlers: (ActionHandler<TState, Action> | undefined)[], state: TState, action: Action) => {
+const callHandlers = <TState>(handlers: (ActionHandler<TState, Action, keyof TState> | undefined)[], state: TState, action: Action) => {
   for (const handler of handlers)
     if (handler)
       state = handler(state, action)
@@ -69,7 +67,7 @@ const callHandlers = <TState>(handlers: (ActionHandler<TState, Action> | undefin
 }
 
 export interface HandlerData {
-  actionHandlers: { [id: string]: ActionHandler<any, any> }
+  actionHandlers: { [id: string]: ActionHandler<any, any, any> }
 }
 
 export type PromiseFn<TRootState = {}, A = any, T = any> = (args: A, injects: { getState: () => TRootState }) => PromiseLike<T>
@@ -89,10 +87,10 @@ export interface HandlerChainPromise<TState, TRootState, TArgs, TAction extends 
  * Chain can be handled in any handler.
  */
 export interface HandlerChainInterface<TState, TArgs = any, TPayload = any, TAction extends Action = Action> {
-  pending(handler: ActionHandler<TState, ArgsAction<TArgs>>): HandlerChainInterface<TState, TArgs, TPayload, TAction>
-  fulfilled(handler: ActionHandler<TState, { payload: TPayload } & ArgsAction<TArgs>>): HandlerChainInterface<TState, TArgs, TPayload, TAction>
-  rejected(handler: ActionHandler<TState, { payload: Error } & ArgsAction<TArgs>>): HandlerChainInterface<TState, TArgs, TPayload, TAction>
-  finally(handler: ActionHandler<TState, ArgsAction<TArgs>>): HandlerChainInterface<TState, TArgs, TPayload, TAction>
+  pending(handler: ActionHandler<TState, ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TArgs, TPayload, TAction>
+  fulfilled(handler: ActionHandler<TState, { payload: TPayload } & ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TArgs, TPayload, TAction>
+  rejected(handler: ActionHandler<TState, { payload: Error } & ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TArgs, TPayload, TAction>
+  finally(handler: ActionHandler<TState, ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TArgs, TPayload, TAction>
 
   /**
    * Creates action.
@@ -124,10 +122,10 @@ class HandlerChain<TState, TRootState, TArgs, TResult, TAction extends Action> i
   private _rejectedCount: number = 0
   private _finallyCount: number = 0
 
-  private _pending: ActionHandler<any, any>[] = []
-  private _fulfilled: ActionHandler<any, any>[] = []
-  private _rejected: ActionHandler<any, any>[] = []
-  private _finally: ActionHandler<any, any>[] = []
+  private _pending: ActionHandler<any, any, any>[] = []
+  private _fulfilled: ActionHandler<any, any, any>[] = []
+  private _rejected: ActionHandler<any, any, any>[] = []
+  private _finally: ActionHandler<any, any, any>[] = []
 
   constructor(private _handler: HandlerData, typeOrChain: string | BaseHandlerChain, public hType?: HandlerType) {
     if (typeof typeOrChain === 'string') {
@@ -176,25 +174,25 @@ class HandlerChain<TState, TRootState, TArgs, TResult, TAction extends Action> i
     return this as any
   }
 
-  pending(handler: ActionHandler<TState, ArgsAction<TArgs>>): HandlerChainInterface<TState, TArgs, TResult, TAction> {
+  pending(handler: ActionHandler<TState, ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TArgs, TResult, TAction> {
     this._pending.push(handler)
     this.getBaseChain()._pendingCount++
     return this
   }
 
-  fulfilled(handler: ActionHandler<TState, { payload: TResult } & ArgsAction<TArgs>>): HandlerChainInterface<TState, TArgs, TResult, TAction> {
+  fulfilled(handler: ActionHandler<TState, { payload: TResult } & ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TArgs, TResult, TAction> {
     this._fulfilled.push(handler)
     this.getBaseChain()._fulfilledCount++
     return this
   }
 
-  rejected(handler: ActionHandler<TState, { payload: Error } & ArgsAction<TArgs>>): HandlerChainInterface<TState, TArgs, TResult, TAction> {
+  rejected(handler: ActionHandler<TState, { payload: Error } & ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TArgs, TResult, TAction> {
     this._rejected.push(handler)
     this.getBaseChain()._rejectedCount++
     return this
   }
 
-  finally(handler: ActionHandler<TState, ArgsAction<TArgs>>): HandlerChainInterface<TState, TArgs, TResult, TAction> {
+  finally(handler: ActionHandler<TState, ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TArgs, TResult, TAction> {
     this._finally.push(handler)
     this.getBaseChain()._finallyCount++
     return this
@@ -255,11 +253,11 @@ export class Handler<TState, TRootState = {}> {
   /**
    * Handle action or chain
    */
-  handle<A extends AnyAction>(type: string, handler: ActionHandler<TState, A>): void
-  handle(fn: (() => Action) & ActionType, handler: ActionHandler<TState, Action>): void
-  handle<T>(fn: ((args: any) => SyncAction<T>) & ActionType, handler: ActionHandler<TState, SyncAction<T>>): void
+  handle<A extends AnyAction>(type: string, handler: ActionHandler<TState, A, keyof TState>): void
+  handle(fn: (() => Action) & ActionType, handler: ActionHandler<TState, Action, keyof TState>): void
+  handle<T>(fn: ((args: any) => SyncAction<T>) & ActionType, handler: ActionHandler<TState, SyncAction<T>, keyof TState>): void
   handle<TRefState, TArgs, TMeta, TResult, TAction extends Action>(chain: HandlerChainInterface<TRefState, TArgs, TResult, TAction>): HandlerChainInterface<TState, TArgs, TResult, TAction>
-  handle(typeOrChain: string | HandlerChainInterface<TState> | ActionType, handler?: ActionHandler<TState, any>) {
+  handle(typeOrChain: string | HandlerChainInterface<TState> | ActionType, handler?: ActionHandler<TState, any, keyof TState>) {
     if (typeof typeOrChain === 'string') {
       this._data.actionHandlers[typeOrChain] = handler!
       return
@@ -274,9 +272,9 @@ export class Handler<TState, TRootState = {}> {
     }
   }
 
-  action(type: string, handler: ActionHandler<TState, Action>): (() => Action) & ActionType
-  action<A>(type: string, handler: ActionHandler<TState, SyncAction<A>>): ((args: A) => SyncAction<A>) & ActionType
-  action(type: string, handler: ActionHandler<TState, any>) {
+  action(type: string, handler: ActionHandler<TState, Action, keyof TState>): (() => Action) & ActionType
+  action<A>(type: string, handler: ActionHandler<TState, SyncAction<A>, keyof TState>): ((args: A) => SyncAction<A>) & ActionType
+  action(type: string, handler: ActionHandler<TState, any, keyof TState>) {
     const realType = this.getActionType(type)
     const action = (payload?: any) => ({ type: realType, payload })
     const modifiedAction: typeof action & ActionType = action as any
@@ -307,12 +305,14 @@ export class Handler<TState, TRootState = {}> {
     return (state = this._initialState, action: Action) =>
       this._data.actionHandlers[action.type]
         ? this._data.actionHandlers[action.type](state, action)
-        : state
+        : state as any
   }
 
   private getActionType(type: string) {
-    if (this._options.prefix)
-      type = `${this._options.prefix}/${type}`
+    const prefix = this._options.prefix
+
+    if (prefix)
+      type = `${typeof prefix === 'string' ? prefix : prefix.join('/')}/${type}`
 
     return type
   }
