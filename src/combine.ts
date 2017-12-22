@@ -12,17 +12,16 @@ export const combineHandlers: <S>(handlers: {[P in keyof S]: Handler<S[P]> | Han
   (handlers) => ({
     children: handlers,
     buildReducer: () => {
+      const reducers: ReducersMapObject = {}
+
       for (const handler in handlers) {
-        const reducers: ReducersMapObject = {}
         const h = handlers[handler]
 
         reducers[handler] = typeof (h as Handler<any>).buildReducer === 'function'
           ? (h as Handler<any>).buildReducer()
           : (h as Handlers<any>).buildReducer()
-
-        return combineReducers(reducers)
       }
 
-      return {} as any
+      return combineReducers(reducers)
     }
   })
