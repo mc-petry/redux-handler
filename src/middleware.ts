@@ -2,11 +2,21 @@ import { Dispatch, Middleware, MiddlewareAPI } from 'redux'
 import { ActionSystem, Lifecycle, Action } from './handler'
 import { Subject } from 'rxjs'
 
-export const handlerMiddleware: Middleware = <S>({ dispatch, getState }: MiddlewareAPI<S>) => {
+export interface ErrorHandlerInjects {
+  /**
+   * Action type
+   */
+  type: string
+}
+
+export interface MiddlewareOptions {
+  errorHandler: (error: any, injects: ErrorHandlerInjects) => Action | void
+}
+
+export const handlerMiddleware: (options: MiddlewareOptions) => Middleware = options => <S>({ dispatch, getState }: MiddlewareAPI<S>) => {
   const action$ = new Subject<Action>()
 
-  const promiseInjectors = { getState: getState as any }
-  const observableInjectors = { action$, getState: getState as any }
+  const promiseInjectors = { getState }
 
   return (next: Dispatch<S>) =>
     (action: ActionSystem) => {
@@ -60,15 +70,18 @@ export const handlerMiddleware: Middleware = <S>({ dispatch, getState }: Middlew
         }
 
         if (typeof action.observable === 'function') {
-          const obs = action.observable(action.args, observableInjectors)
-            .mergeMap((x: Action) => {
+          const obs = action.observable(action.args, { action$, getState, type: action.type })
+            .mergeMap((output: Action) => {
+              if (!output)
+                throw new TypeError(`Action ${action.type} does not return a stream`)
+
               const payloads: any[] = []
 
-              if (x && x.type) {
-                dispatch(x)
+              if (output && typeof output.type === 'string') {
+                dispatch(output)
               }
               else {
-                payloads.push(x)
+                payloads.push(output)
               }
 
               return payloads
@@ -96,7 +109,16 @@ export const handlerMiddleware: Middleware = <S>({ dispatch, getState }: Middlew
                   error: true
                 })
 
-              if (!action.__rejected) {
+              if (options.errorHandler) {
+                if (options && options.errorHandler) {
+                  const errorAction = options.errorHandler(error, { type: action.type })
+
+                  if (errorAction && typeof (errorAction as Action).type === 'string')
+                    dispatch(errorAction as Action)
+                }
+              }
+
+              if (!action.__rejected && !(options && options.errorHandler)) {
                 // tslint:disable-next-line:no-console
                 console.error(error)
               }

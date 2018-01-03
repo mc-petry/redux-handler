@@ -26,7 +26,7 @@ export interface PromiseAction<T, A> {
   promise?: PromiseFn<T, A>
 }
 
-export interface ObservableAction<T, A> {
+export interface ObservableAction<T, A> extends Action {
   observable?: ObservableFn<T, A>
 }
 
@@ -71,7 +71,7 @@ export interface HandlerData {
 }
 
 export type PromiseFn<TRootState = {}, A = any, T = any> = (args: A, injects: { getState: () => TRootState }) => PromiseLike<T>
-export type ObservableFn<TRootState = {}, A = any, T = any> = (args: A, injects: { action$: Observable<Action>, getState: () => TRootState }) => Observable<T>
+export type ObservableFn<TRootState = {}, A = any, T = any> = (args: A, injects: { action$: Observable<Action>, getState: () => TRootState, type: string }) => Observable<T>
 
 type BaseHandlerChain = HandlerChain<any, any, any, any, any>
 
