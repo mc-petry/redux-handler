@@ -1,4 +1,4 @@
-import { CUSTOM_NAME, DEFAULT_NAME, getDefaultName, getName, getCatch, setDefaultName, setName, obs, obsCancelled, obsCancel, obsMultipleActions, obsNotCatched, notCatched, obsEmptyPayloadAction, obsTestHandle } from './modules/library'
+import { CUSTOM_NAME, DEFAULT_NAME, getDefaultName, getName, getCatch, setDefaultName, setName, obs, obsCancelled, obsCancel, obsMultipleActions, obsNotCatched, notCatched, obsEmptyPayloadAction, obsTestHandle, shouldNotBeCalledTwice } from './modules/library'
 import { store } from './store'
 import { Observable } from 'rxjs'
 
@@ -92,7 +92,7 @@ describe('observable', () => {
   test('empty action', () =>
     new Promise(resolve => store.dispatch(obsEmptyPayloadAction()).add(resolve)).then(() => {
       const state = store.getState().lib
-      expect(state.obsEmptyPayload).toBeNull()
+      expect(state.obsEmptyPayload).toBeUndefined()
     }))
 
   test('handle', () =>
@@ -102,4 +102,12 @@ describe('observable', () => {
       expect(state.obsHandleFulfilled).toBeTruthy()
       expect(state.obsHandleFinally).toBeTruthy()
     }))
+
+  test('available', () =>
+    new Promise(resolve => store.dispatch(shouldNotBeCalledTwice('yo')).add(resolve))
+      .then(() => new Promise(resolve => store.dispatch(shouldNotBeCalledTwice('yo2')).add(resolve)))
+      .then(() => {
+        const lib = store.getState().lib
+        expect(lib.notCall).toBe('yo')
+      }))
 })

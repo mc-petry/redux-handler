@@ -41,6 +41,7 @@ export enum Lifecycle {
 export interface ActionSystem extends ArgsAction<any> {
   promise?: PromiseFn
   observable?: ObservableFn
+  __available: AvailableFn
   __state: Lifecycle
   __pending: boolean
   __fulfilled: boolean
@@ -72,25 +73,27 @@ export interface HandlerData {
 
 export type PromiseFn<TRootState = {}, A = any, T = any> = (args: A, injects: { getState: () => TRootState }) => PromiseLike<T>
 export type ObservableFn<TRootState = {}, A = any, T = any> = (args: A, injects: { action$: Observable<Action>, getState: () => TRootState, type: string }) => Observable<T>
+export type AvailableFn<TRootState = {}, A = any> = (getState: () => TRootState, other: { args: A, type: string }) => boolean
 
 type BaseHandlerChain = HandlerChain<any, any, any, any, any>
 
 export interface HandlerChainObservable<TState, TRootState, TArgs, TAction extends Action> {
-  call<TPayload>(observable$: ObservableFn<TRootState, TArgs, TPayload>): HandlerChainInterface<TState, TArgs, TPayload, TAction>
+  call<TPayload>(observable$: ObservableFn<TRootState, TArgs, TPayload>): HandlerChainInterface<TState, TRootState, TArgs, TPayload, TAction>
 }
 
 export interface HandlerChainPromise<TState, TRootState, TArgs, TAction extends Action> {
-  call<TPayload>(fn: PromiseFn<TRootState, TArgs, TPayload>): HandlerChainInterface<TState, TArgs, TPayload, TAction>
+  call<TPayload>(fn: PromiseFn<TRootState, TArgs, TPayload>): HandlerChainInterface<TState, TRootState, TArgs, TPayload, TAction>
 }
 
 /**
  * Chain can be handled in any handler.
  */
-export interface HandlerChainInterface<TState, TArgs = any, TPayload = any, TAction extends Action = Action> {
-  pending(handler: ActionHandler<TState, ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TArgs, TPayload, TAction>
-  fulfilled(handler: ActionHandler<TState, { payload: TPayload } & ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TArgs, TPayload, TAction>
-  rejected(handler: ActionHandler<TState, { payload: Error } & ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TArgs, TPayload, TAction>
-  finally(handler: ActionHandler<TState, ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TArgs, TPayload, TAction>
+export interface HandlerChainInterface<TState, TRootState, TArgs = any, TPayload = any, TAction extends Action = Action> {
+  available(fn: (getState: () => TRootState, other: { args: TArgs, type: string }) => boolean): HandlerChainInterface<TState, TRootState, TArgs, TPayload, TAction>
+  pending(handler: ActionHandler<TState, ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TRootState, TArgs, TPayload, TAction>
+  fulfilled(handler: ActionHandler<TState, { payload: TPayload } & ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TRootState, TArgs, TPayload, TAction>
+  rejected(handler: ActionHandler<TState, { payload: Error } & ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TRootState, TArgs, TPayload, TAction>
+  finally(handler: ActionHandler<TState, ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TRootState, TArgs, TPayload, TAction>
 
   /**
    * Creates action.
@@ -109,7 +112,7 @@ const getRootChain = (parentChain: BaseHandlerChain): BaseHandlerChain =>
     ? getRootChain(parentChain.parentChain)
     : parentChain
 
-class HandlerChain<TState, TRootState, TArgs, TResult, TAction extends Action> implements HandlerChainInterface<TState, TArgs, TResult, TAction> {
+class HandlerChain<TState, TRootState, TArgs, TResult, TAction extends Action> implements HandlerChainInterface<TState, TRootState, TArgs, TResult, TAction> {
   parentChain: BaseHandlerChain
   type: string
 
@@ -122,6 +125,7 @@ class HandlerChain<TState, TRootState, TArgs, TResult, TAction extends Action> i
   private _rejectedCount: number = 0
   private _finallyCount: number = 0
 
+  private _available: AvailableFn
   private _pending: ActionHandler<any, any, any>[] = []
   private _fulfilled: ActionHandler<any, any, any>[] = []
   private _rejected: ActionHandler<any, any, any>[] = []
@@ -163,7 +167,7 @@ class HandlerChain<TState, TRootState, TArgs, TResult, TAction extends Action> i
     }
   }
 
-  call<P>(observableOrPromise: PromiseFn<TRootState, TArgs, P> | ObservableFn<TRootState, TArgs, P>): HandlerChainInterface<TState, TArgs, P, TAction> {
+  call<P>(observableOrPromise: PromiseFn<TRootState, TArgs, P> | ObservableFn<TRootState, TArgs, P>): HandlerChainInterface<TState, TRootState, TArgs, P, TAction> {
     if (this.hType === HandlerType.Observable) {
       this._observableFn = observableOrPromise as ObservableFn<TRootState>
     }
@@ -174,25 +178,30 @@ class HandlerChain<TState, TRootState, TArgs, TResult, TAction extends Action> i
     return this as any
   }
 
-  pending(handler: ActionHandler<TState, ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TArgs, TResult, TAction> {
+  available(fn: (getState: () => TRootState, other: { args: TArgs, type: string }) => boolean): HandlerChainInterface<TState, TRootState, TArgs, TResult, TAction> {
+    this._available = fn
+    return this
+  }
+
+  pending(handler: ActionHandler<TState, ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TRootState, TArgs, TResult, TAction> {
     this._pending.push(handler)
     this.getBaseChain()._pendingCount++
     return this
   }
 
-  fulfilled(handler: ActionHandler<TState, { payload: TResult } & ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TArgs, TResult, TAction> {
+  fulfilled(handler: ActionHandler<TState, { payload: TResult } & ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TRootState, TArgs, TResult, TAction> {
     this._fulfilled.push(handler)
     this.getBaseChain()._fulfilledCount++
     return this
   }
 
-  rejected(handler: ActionHandler<TState, { payload: Error } & ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TArgs, TResult, TAction> {
+  rejected(handler: ActionHandler<TState, { payload: Error } & ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TRootState, TArgs, TResult, TAction> {
     this._rejected.push(handler)
     this.getBaseChain()._rejectedCount++
     return this
   }
 
-  finally(handler: ActionHandler<TState, ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TArgs, TResult, TAction> {
+  finally(handler: ActionHandler<TState, ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TRootState, TArgs, TResult, TAction> {
     this._finally.push(handler)
     this.getBaseChain()._finallyCount++
     return this
@@ -211,6 +220,7 @@ class HandlerChain<TState, TRootState, TArgs, TResult, TAction extends Action> i
         type: this.type,
         args,
         __state: Lifecycle.INIT,
+        __available: this._available,
         __pending: this._pendingCount > 0,
         __fulfilled: this._fulfilledCount > 0,
         __rejected: this._rejectedCount > 0,
@@ -256,13 +266,13 @@ export class Handler<TState, TRootState = {}> {
   handle<A extends AnyAction>(type: string, handler: ActionHandler<TState, A, keyof TState>): void
   handle(fn: (() => Action) & ActionType, handler: ActionHandler<TState, Action, keyof TState>): void
   handle<T>(fn: ((args: any) => SyncAction<T>) & ActionType, handler: ActionHandler<TState, SyncAction<T>, keyof TState>): void
-  handle<TRefState, TArgs, TMeta, TResult, TAction extends Action>(chain: HandlerChainInterface<TRefState, TArgs, TResult, TAction>): HandlerChainInterface<TState, TArgs, TResult, TAction>
-  handle(typeOrChain: string | HandlerChainInterface<TState> | ActionType, handler?: ActionHandler<TState, any, keyof TState>) {
+  handle<TRefState, TArgs, TMeta, TResult, TAction extends Action>(chain: HandlerChainInterface<TRefState, TRootState, TArgs, TResult, TAction>): HandlerChainInterface<TState, TRootState, TArgs, TResult, TAction>
+  handle(typeOrChain: string | HandlerChainInterface<TState, TRootState> | ActionType, handler?: ActionHandler<TState, any, keyof TState>) {
     if (typeof typeOrChain === 'string') {
       this._data.actionHandlers[typeOrChain] = handler!
       return
     }
-    else if (typeof (typeOrChain as HandlerChainInterface<TState>).fulfilled === 'function') {
+    else if (typeof (typeOrChain as HandlerChainInterface<TState, TRootState>).fulfilled === 'function') {
       const chain = typeOrChain as BaseHandlerChain
       return new HandlerChain<TState, TRootState, any, any, any>(this._data, chain) as HandlerChainInterface<any, any, any, any>
     }

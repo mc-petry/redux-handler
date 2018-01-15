@@ -13,4 +13,4 @@ const reducers: {[P in keyof Store]: Reducer<Store[P]> } = {
   lib2
 }
 
-export const store = createStore(combineReducers<Store>(reducers), applyMiddleware(handlerMiddleware))
+export const store = createStore(combineReducers<Store>(reducers), applyMiddleware(handlerMiddleware()))

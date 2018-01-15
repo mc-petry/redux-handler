@@ -26,10 +26,15 @@ export interface LibraryStore {
   multiple3?: boolean
 
   multipleResult: string
-  obsEmptyPayload?: null
+  obsEmptyPayload?: string
+  notCall?: string
 }
 
-const handler = new Handler<LibraryStore>({ const: 'INIT', corp: null, multipleResult: '' }, { prefix: 'library' })
+const handler = new Handler<LibraryStore, Store>({
+  const: 'INIT',
+  corp: null,
+  multipleResult: ''
+}, { prefix: 'library' })
 
 export const setDefaultName = handler.action('SET_DEFAULT_NAME', state => ({ ...state, name: DEFAULT_NAME }))
 export const setName = handler.action<{ name: string }>('SET_CUSTOM_NAME', (state, action) => ({ ...state, name: action.payload.name }))
@@ -90,7 +95,7 @@ export const obs = handler
 
 export const obsTestHandleChain = handler
   .observable('TEST_HANDLE_CHAIN')
-  .call(() => Observable.of(null))
+  .call(() => Observable.of({}))
 
 export const obsTestHandle = obsTestHandleChain.build()
 
@@ -123,9 +128,15 @@ export const obsMultipleActions = handler
 export const obsEmptyPayloadAction = handler
   .observable('TEST_OBS_EMPTY_PAYLOAD')
   .call(() =>
-    Observable.of({ type: 'test' })
-      .concat(Observable.of(null)))
-  .fulfilled((s, a) => ({ ...s, obsEmptyPayload: a.payload }))
+    Observable.of({ type: 'test' }))
+  .fulfilled((s, a) => ({ ...s, obsEmptyPayload: 'empty' }))
+  .build()
+
+export const shouldNotBeCalledTwice = handler
+  .observable<string>('TEST_OBS_SHOULD_NOT_CALL')
+  .call(() => Observable.of({ prop: 'some' }))
+  .available((getState) => !getState().lib.notCall)
+  .fulfilled((s, { args }) => ({ ...s, notCall: args }))
   .build()
 
 export const lib = handler.buildReducer()

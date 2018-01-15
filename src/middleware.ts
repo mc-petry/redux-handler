@@ -1,6 +1,6 @@
 import { Dispatch, Middleware, MiddlewareAPI } from 'redux'
 import { ActionSystem, Lifecycle, Action } from './handler'
-import { Subject } from 'rxjs'
+import { Subject, Observable } from 'rxjs'
 
 export interface ErrorHandlerInjects {
   /**
@@ -10,10 +10,10 @@ export interface ErrorHandlerInjects {
 }
 
 export interface MiddlewareOptions {
-  errorHandler: (error: any, injects: ErrorHandlerInjects) => Action | void
+  errorHandler?: (error: any, injects: ErrorHandlerInjects) => Action | void
 }
 
-export const handlerMiddleware: (options: MiddlewareOptions) => Middleware = options => <S>({ dispatch, getState }: MiddlewareAPI<S>) => {
+export const handlerMiddleware: (options?: MiddlewareOptions) => Middleware = (options = {}) => <S>({ dispatch, getState }: MiddlewareAPI<S>) => {
   const action$ = new Subject<Action>()
 
   const promiseInjectors = { getState }
@@ -22,6 +22,14 @@ export const handlerMiddleware: (options: MiddlewareOptions) => Middleware = opt
     (action: ActionSystem) => {
       if (action.__state === Lifecycle.INIT) {
         action$.next(next(action) as any)
+
+        if (action.__available && !action.__available(getState, action)) {
+          if (typeof action.promise === 'function')
+            return Promise.resolve()
+
+          if (typeof action.observable === 'function')
+            return Observable.empty().subscribe()
+        }
 
         if (action.__pending)
           dispatch({
@@ -77,7 +85,7 @@ export const handlerMiddleware: (options: MiddlewareOptions) => Middleware = opt
 
               const payloads: any[] = []
 
-              if (output && typeof output.type === 'string') {
+              if (typeof output.type === 'string') {
                 dispatch(output)
               }
               else {
