@@ -21,8 +21,6 @@ export const handlerMiddleware: (options?: MiddlewareOptions) => Middleware = (o
   return (next: Dispatch<S>) =>
     (action: ActionSystem) => {
       if (action.__state === Lifecycle.INIT) {
-        action$.next(next(action) as any)
-
         if (action.__available && !action.__available(getState, action)) {
           if (typeof action.promise === 'function')
             return Promise.resolve()

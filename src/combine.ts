@@ -5,13 +5,13 @@ export interface Handlers<S> {
   children: {
     [P in keyof S]: Handler<S[P]> | Handlers<S[P]>
   }
-  buildReducer<RS>(other?: {[P in keyof RS]: Reducer<RS>}): Reducer<S & RS>
+  buildReducer<RS>(other?: {[P in keyof RS]: Reducer<RS[P]>}): Reducer<S & RS>
 }
 
 export const combineHandlers: <S>(handlers: {[P in keyof S]: Handler<S[P]> | Handlers<S[P]>}) => Handlers<S> =
   (handlers) => ({
     children: handlers,
-    buildReducer: <RS>(other?: {[P in keyof RS]: Reducer<RS> }) => {
+    buildReducer: <RS>(other?: {[P in keyof RS]: Reducer<RS[P]>}) => {
       const reducers: { [key: string]: Reducer<any> } = other || {}
 
       for (const handler in handlers) {
@@ -24,15 +24,4 @@ export const combineHandlers: <S>(handlers: {[P in keyof S]: Handler<S[P]> | Han
 
       return combineReducers(reducers) as any
     }
-  })
-
-interface TestStore {
-  store: { test?: string }
-}
-
-combineHandlers<TestStore>({
-  store: new Handler<{ test?: string }>({})
-})
-  .buildReducer({
-
   })
