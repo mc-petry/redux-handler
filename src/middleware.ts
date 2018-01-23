@@ -78,12 +78,12 @@ export const handlerMiddleware: (options?: MiddlewareOptions) => Middleware = (o
         if (typeof action.observable === 'function') {
           const obs = action.observable(action.args, { action$, getState, type: action.type })
             .mergeMap((output: Action) => {
-              if (!output)
+              if (output === undefined)
                 throw new TypeError(`Action ${action.type} does not return a stream`)
 
               const payloads: any[] = []
 
-              if (typeof output.type === 'string') {
+              if (output && typeof output.type === 'string') {
                 dispatch(output)
               }
               else {
