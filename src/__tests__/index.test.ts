@@ -1,6 +1,6 @@
-import { CUSTOM_NAME, DEFAULT_NAME, getDefaultName, getName, getCatch, setDefaultName, setName, obs, obsCancelled, obsCancel, obsMultipleActions, obsNotCatched, notCatched, obsEmptyPayloadAction, obsTestHandle, shouldNotBeCalledTwice } from './modules/library'
+import { CUSTOM_NAME, DEFAULT_NAME, getDefaultName, getName, getCatch, setDefaultName, setName, obs, obsCancelled, obsCancel, obsMultipleActions, notCatched, obsEmptyPayloadAction, obsTestHandle, shouldNotBeCalledTwice } from './modules/library'
 import { store } from './store'
-import { Observable } from 'rxjs'
+import { Observable, timer } from 'rxjs'
 
 describe('action', () => {
   test('parameterless', () => {
@@ -73,7 +73,7 @@ describe('observable', () => {
     }))
 
   test('cancellation', () => {
-    Observable.timer(100).subscribe(() => store.dispatch(obsCancel()))
+    timer(100).subscribe(() => store.dispatch(obsCancel()))
     return new Promise(resolve => store.dispatch(obsCancelled()).add(resolve)).then(() => {
       const state = store.getState().lib
       expect(state.obsNotCancelled).not.toBeTruthy()

@@ -2,7 +2,7 @@ import { Action, Reducer, AnyAction } from 'redux'
 import { Observable, Subscription } from 'rxjs'
 
 declare module 'redux' {
-  interface Dispatch<S> {
+  interface Dispatch<A extends Action = AnyAction> {
     // tslint:disable-next-line:callable-types
     <T, P extends PromiseLike<T>, A>(action: PromiseAction<T, A>): P
     <T, P extends Subscription, A>(action: ObservableAction<T, A>): P

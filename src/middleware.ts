@@ -1,6 +1,7 @@
 import { Dispatch, Middleware, MiddlewareAPI } from 'redux'
 import { ActionSystem, Lifecycle, Action } from './handler'
-import { Subject, Observable } from 'rxjs'
+import { Subject, EMPTY } from 'rxjs'
+import { mergeMap, finalize } from 'rxjs/operators'
 
 export interface ErrorHandlerInjects {
   /**
@@ -13,7 +14,7 @@ export interface MiddlewareOptions {
   errorHandler?: (error: any, injects: ErrorHandlerInjects) => Action | void
 }
 
-export const handlerMiddleware: (options?: MiddlewareOptions) => Middleware = (options = {}) => <S>({ dispatch, getState }: MiddlewareAPI<S>) => {
+export const handlerMiddleware: (options?: MiddlewareOptions) => Middleware = (options = {}) => <D extends Dispatch, S extends Action>({ dispatch, getState }: MiddlewareAPI<D, S>) => {
   const action$ = new Subject<Action>()
 
   const promiseInjectors = { getState }
@@ -26,7 +27,7 @@ export const handlerMiddleware: (options?: MiddlewareOptions) => Middleware = (o
             return Promise.resolve()
 
           if (typeof action.observable === 'function')
-            return Observable.empty().subscribe()
+            return EMPTY.subscribe()
         }
 
         if (action.__pending)
@@ -77,28 +78,29 @@ export const handlerMiddleware: (options?: MiddlewareOptions) => Middleware = (o
 
         if (typeof action.observable === 'function') {
           const obs = action.observable(action.args, { action$, getState, type: action.type })
-            .mergeMap((output: Action) => {
-              if (output === undefined)
-                throw new TypeError(`Action ${action.type} does not return a stream`)
+            .pipe(
+              mergeMap((output: Action) => {
+                if (output === undefined)
+                  throw new TypeError(`Action ${action.type} does not return a stream`)
 
-              const payloads: any[] = []
+                const payloads: any[] = []
 
-              if (output && typeof output.type === 'string') {
-                dispatch(output)
-              }
-              else {
-                payloads.push(output)
-              }
+                if (output && typeof output.type === 'string') {
+                  dispatch(output)
+                }
+                else {
+                  payloads.push(output)
+                }
 
-              return payloads
-            })
-            .finally(() => {
-              if (action.__finally)
-                dispatch({
-                  ...action,
-                  __state: Lifecycle.Finally
-                })
-            })
+                return payloads
+              }),
+              finalize(() => {
+                if (action.__finally)
+                  dispatch({
+                    ...action,
+                    __state: Lifecycle.Finally
+                  })
+              }))
             .subscribe(payload => {
               if (action.__fulfilled)
                 dispatch({

@@ -1,6 +1,7 @@
 import { Handler } from '../../'
 import { Store } from '../store'
-import { Observable } from 'rxjs'
+import { Observable, of } from 'rxjs'
+import { delay, takeUntil, filter, concat, tap } from 'rxjs/operators'
 
 export const DEFAULT_NAME = 'Jesica'
 export const CUSTOM_NAME = 'Veronica'
@@ -74,14 +75,16 @@ export const notCatched = handler
 
 export const obs = handler
   .observable<{ withError?: boolean }>('TEST_OBS1')
-  .call((a) => {
-    return Observable.of({ name: 'John' })
-      .delay(10)
-      .do(() => {
-        if (a.withError)
-          throw new Error('RxJS.Err')
-      })
-  })
+  .call((a) =>
+    of({ name: 'John' })
+      .pipe(
+        delay(10),
+        tap(() => {
+          if (a.withError)
+            throw new Error('RxJS.Err')
+        })
+      )
+  )
   .pending(s => ({ ...s, obsPending: true }))
   .fulfilled((s, a) => ({ ...s, obsFulfilled: a.payload.name }))
   .rejected((s, a) => ({ ...s, obsRejected: true }))
@@ -95,7 +98,7 @@ export const obs = handler
 
 export const obsTestHandleChain = handler
   .observable('TEST_HANDLE_CHAIN')
-  .call(() => Observable.of({}))
+  .call(() => of({}))
 
 export const obsTestHandle = obsTestHandleChain.build()
 
@@ -103,10 +106,11 @@ export const obsCancel = handler.action('TEST_OBS_CANCEL', s => s)
 
 export const obsCancelled = handler
   .observable('TEST_OBS_CANCELLED')
-  .call((_, { action$ }) =>
-    Observable.of({ test: '123' })
-      .delay(200)
-      .takeUntil(action$.filter(x => x.type === obsCancel.type)))
+  .call((_, { action$ }) => of({ test: '123' })
+    .pipe(
+      delay(200),
+      takeUntil(action$.pipe(filter(x => x.type === obsCancel.type)))
+    ))
   .fulfilled((s) => ({ ...s, obsNotCancelled: true }))
   .build()
 
@@ -116,25 +120,27 @@ export const obsMultiple3 = handler.action('M3', s => ({ ...s, multiple3: true }
 
 export const obsMultipleActions = handler
   .observable('TEST_OBS_MULTIPLE')
-  .call(() =>
-    Observable.of(obsMultiple1()).delay(10)
-      .concat(Observable.of(obsMultiple2()))
-      .concat(Observable.of({ a1: 'Lo' }).delay(10))
-      .concat(Observable.of({ a1: 'dash' }).delay(10))
-      .concat(Observable.of(obsMultiple3()).delay(10)))
+  .call(() => of(obsMultiple1()).pipe(delay(10))
+    .pipe(
+      concat(
+        of(obsMultiple2()),
+        of({ a1: 'Lo' }).pipe(delay(10)),
+        of({ a1: 'dash' }).pipe(delay(10)),
+        of(obsMultiple3()).pipe(delay(10))
+      )
+    ))
   .fulfilled((s, a) => ({ ...s, multipleResult: s.multipleResult + (a.payload as any).a1 }))
   .build()
 
 export const obsEmptyPayloadAction = handler
   .observable('TEST_OBS_EMPTY_PAYLOAD')
-  .call(() =>
-    Observable.of({ type: 'test' }))
+  .call(() => of({ type: 'test' }))
   .fulfilled((s, a) => ({ ...s, obsEmptyPayload: 'empty' }))
   .build()
 
 export const shouldNotBeCalledTwice = handler
   .observable<string>('TEST_OBS_SHOULD_NOT_CALL')
-  .call(() => Observable.of({ prop: 'some' }))
+  .call(() => of({ prop: 'some' }))
   .available((getState) => !getState().lib.notCall)
   .fulfilled((s, { args }) => ({ ...s, notCall: args }))
   .build()
