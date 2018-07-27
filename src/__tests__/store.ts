@@ -1,16 +1,17 @@
 import { createStore, combineReducers, applyMiddleware, Reducer } from 'redux'
-import { handlerMiddleware } from '../'
-import { LibraryStore, lib } from './modules/library'
-import { Lib2Store, lib2 } from './modules/library2'
+import { handlerMiddleware, combineHandlers } from '../'
+import { RxStoreA, rxHandler } from './modules/rx'
+import { RxStoreB, rxHandler2 } from './modules/rx2'
 
-export interface Store {
-  lib: LibraryStore
-  lib2: Lib2Store
+export interface RootStore {
+  rxA: RxStoreA
+  rxB: RxStoreB
 }
 
-const reducers: {[P in keyof Store]: Reducer<Store[P]> } = {
-  lib,
-  lib2
-}
+const reducer = combineHandlers<RootStore>({
+  rxA: rxHandler,
+  rxB: rxHandler2
+})
+  .buildReducer()
 
-export const store = createStore(combineReducers<Store>(reducers), applyMiddleware(handlerMiddleware()))
+export const store = createStore(reducer, applyMiddleware(handlerMiddleware()))

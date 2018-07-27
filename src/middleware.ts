@@ -1,7 +1,6 @@
 import { Dispatch, Middleware, MiddlewareAPI } from 'redux'
-import { ActionSystem, Lifecycle, Action } from './handler'
-import { Subject, EMPTY } from 'rxjs'
-import { mergeMap, finalize } from 'rxjs/operators'
+import { InternalAction, Action, META_SYM } from './types'
+import { AsyncOperatorOnNextEvent, AsyncOperatorOnBeforeNextEvent } from './api'
 
 export interface ErrorHandlerInjects {
   /**
@@ -11,135 +10,65 @@ export interface ErrorHandlerInjects {
 }
 
 export interface MiddlewareOptions {
+  /**
+   * You can return a new action to dispatch in store
+   */
   errorHandler?: (error: any, injects: ErrorHandlerInjects) => Action | void
 }
 
-export const handlerMiddleware: (options?: MiddlewareOptions) => Middleware = (options = {}) => <D extends Dispatch, S extends Action>({ dispatch, getState }: MiddlewareAPI<D, S>) => {
-  const action$ = new Subject<Action>()
+type Mutable<T> = { -readonly [P in keyof T]: T[P] }
 
-  const promiseInjectors = { getState }
+export const handlerMiddleware: (options?: MiddlewareOptions) => Middleware =
+  (options = {}) => <D extends Dispatch, S>({ dispatch, getState }: MiddlewareAPI<D, S>) =>
+    (next: Dispatch<Action>) =>
+      (action: InternalAction) => {
+        const meta = action[META_SYM]
 
-  return (next: Dispatch<S>) =>
-    (action: ActionSystem) => {
-      if (action.__state === Lifecycle.INIT) {
-        if (action.__available && !action.__available(getState, action)) {
-          if (typeof action.promise === 'function')
-            return Promise.resolve()
+        // #region Handle before hooks
 
-          if (typeof action.observable === 'function')
-            return EMPTY.subscribe()
+        if (meta && meta.operators) {
+          const eventArgs: Mutable<AsyncOperatorOnBeforeNextEvent<S>> = {
+            action,
+            dispatch,
+            getState,
+            options,
+            defaultPrevented: false,
+
+            preventDefault: () => {
+              eventArgs.defaultPrevented = true
+            }
+          }
+
+          for (const op of meta.operators)
+            if (op.hooks.beforeNext) {
+              const res = op.hooks.beforeNext(eventArgs)
+
+              if (res !== undefined)
+                return res
+            }
         }
 
-        if (action.__pending)
-          dispatch({
-            ...action,
-            __state: Lifecycle.Pending
-          })
+        // #endregion
 
-        if (typeof action.promise === 'function') {
-          return action.promise(action.args, promiseInjectors).then(
-            payload => {
-              if (action.__fulfilled)
-                dispatch({
-                  ...action,
-                  __state: Lifecycle.Fulfilled,
-                  payload
-                })
+        action = next(action)
 
-              if (action.__finally)
-                dispatch({
-                  ...action,
-                  __state: Lifecycle.Finally
-                })
+        // #region Handle after hooks
 
-              return payload
-            },
-            error => {
-              if (action.__rejected)
-                dispatch({
-                  ...action,
-                  __state: Lifecycle.Rejected,
-                  payload: error,
-                  error: true
-                })
+        if (meta && meta.operators) {
+          const eventArgs: Mutable<AsyncOperatorOnNextEvent<S>> = { action, dispatch, getState, options }
 
-              if (action.__finally)
-                dispatch({
-                  ...action,
-                  __state: Lifecycle.Finally
-                })
+          for (const op of meta.operators)
+            if (op.hooks.afterNext) {
+              const res = op.hooks.afterNext(eventArgs)
 
-              if (!action.__rejected)
-                throw error
+              if (res !== undefined)
+                eventArgs.action = res
+            }
 
-              return error
-            })
+          return eventArgs.action
         }
 
-        if (typeof action.observable === 'function') {
-          const obs = action.observable(action.args, { action$, getState, type: action.type })
-            .pipe(
-              mergeMap((output: Action) => {
-                if (output === undefined)
-                  throw new TypeError(`Action ${action.type} does not return a stream`)
+        // #endregion
 
-                const payloads: any[] = []
-
-                if (output && typeof output.type === 'string') {
-                  dispatch(output)
-                }
-                else {
-                  payloads.push(output)
-                }
-
-                return payloads
-              }),
-              finalize(() => {
-                if (action.__finally)
-                  dispatch({
-                    ...action,
-                    __state: Lifecycle.Finally
-                  })
-              }))
-            .subscribe(payload => {
-              if (action.__fulfilled)
-                dispatch({
-                  ...action,
-                  __state: Lifecycle.Fulfilled,
-                  payload
-                })
-            }, error => {
-              if (action.__rejected)
-                dispatch({
-                  ...action,
-                  __state: Lifecycle.Rejected,
-                  payload: error,
-                  error: true
-                })
-
-              if (options.errorHandler) {
-                if (options && options.errorHandler) {
-                  const errorAction = options.errorHandler(error, { type: action.type })
-
-                  if (errorAction && typeof (errorAction as Action).type === 'string')
-                    dispatch(errorAction as Action)
-                }
-              }
-
-              if (!action.__rejected && !(options && options.errorHandler)) {
-                // tslint:disable-next-line:no-console
-                console.error(error)
-              }
-            })
-
-          return obs
-        }
-
-        throw new Error()
+        return action
       }
-
-      const result = next(action) as any
-      action$.next(result)
-      return result
-    }
-}

@@ -1,329 +1,285 @@
-import { Action, Reducer, AnyAction } from 'redux'
-import { Observable, Subscription } from 'rxjs'
+import { Lifecycle, ActionHandler, Action, InternalAction, InternalHandler, ArgsAction, META_SYM, ARGS_SYM } from './types'
+import { AsyncOperator, AsyncOperatorOnInitEvent, AsyncOperatorOnActionCreatingEvent } from './api'
+import { Reducer } from 'redux'
+import { HandlerChain } from './handler-chain'
+import { prefixGenerator, actionTypeGenerator } from './internal/generators'
 
-declare module 'redux' {
-  interface Dispatch<A extends Action = AnyAction> {
-    // tslint:disable-next-line:callable-types
-    <T, P extends PromiseLike<T>, A>(action: PromiseAction<T, A>): P
-    <T, P extends Subscription, A>(action: ObservableAction<T, A>): P
-  }
-}
-
-export interface Action {
-  type: string
-}
-
-export interface SyncAction<T> extends Action {
-  type: string
-  payload: T
-}
-
-export interface ArgsAction<A> extends Action {
-  args: A
-}
-
-export interface PromiseAction<T, A> {
-  promise?: PromiseFn<T, A>
-}
-
-export interface ObservableAction<T, A> extends Action {
-  observable?: ObservableFn<T, A>
-}
-
-export enum Lifecycle {
-  INIT = 'init',
-  Pending = 'pending',
-  Fulfilled = 'fulfilled',
-  Rejected = 'rejected',
-  Finally = 'finally'
-}
-
-export interface ActionSystem extends ArgsAction<any> {
-  promise?: PromiseFn
-  observable?: ObservableFn
-  __available: AvailableFn
-  __state: Lifecycle
-  __pending: boolean
-  __fulfilled: boolean
-  __rejected: boolean
-  __finally: boolean
-}
-
-export type ActionHandler<S, A, K extends keyof S> = (state: Readonly<S>, action: A) => Pick<S, K>
-
-export interface HandlerOptions {
-  prefix?: string | string[]
-}
-
-export interface ActionType {
-  type: string
-}
-
-const callHandlers = <TState>(handlers: (ActionHandler<TState, Action, keyof TState> | undefined)[], state: TState, action: Action) => {
-  for (const handler of handlers)
-    if (handler)
-      state = handler(state, action)
+const callHandlers = <TState>(handlers: ActionHandler<TState, Action>[], state: TState, action: Action) => {
+  for (const h of handlers)
+    state = h(state, action)
 
   return state
 }
 
-export interface HandlerData {
-  actionHandlers: { [id: string]: ActionHandler<any, any, any> }
+const FACTORY_SYM = Symbol('factory')
+
+const enum FactoryType {
+  Sync = 1,
+  Pipe = 2
 }
 
-export type PromiseFn<TRootState = {}, A = any, T = any> = (args: A, injects: { getState: () => TRootState }) => PromiseLike<T>
-export type ObservableFn<TRootState = {}, A = any, T = any> = (args: A, injects: { action$: Observable<Action>, getState: () => TRootState, type: string }) => Observable<T>
-export type AvailableFn<TRootState = {}, A = any> = (getState: () => TRootState, other: { args: A, type: string }) => boolean
+interface Factory {
+  /**
+   * Action type
+   */
+  TYPE: string
 
-type BaseHandlerChain = HandlerChain<any, any, any, any, any>
-
-export interface HandlerChainObservable<TState, TRootState, TArgs, TAction extends Action> {
-  call<TPayload>(observable$: ObservableFn<TRootState, TArgs, TPayload>): HandlerChainInterface<TState, TRootState, TArgs, TPayload, TAction>
+  [FACTORY_SYM]: {
+    type: FactoryType
+  }
 }
 
-export interface HandlerChainPromise<TState, TRootState, TArgs, TAction extends Action> {
-  call<TPayload>(fn: PromiseFn<TRootState, TArgs, TPayload>): HandlerChainInterface<TState, TRootState, TArgs, TPayload, TAction>
-}
+type ActionCreatorWithoutArgs<TAction, TPayload> = (() => TAction) & Factory
+type ActionCreatorWithArgs<TAction, TPayload, TArgs> = ((args: TArgs) => TAction) & Factory
 
 /**
- * Chain can be handled in any handler.
+ * We needs explicit Action Creator types to infer TArgs & TPayload
  */
-export interface HandlerChainInterface<TState, TRootState, TArgs = any, TPayload = any, TAction extends Action = Action> {
-  available(fn: (getState: () => TRootState, other: { args: TArgs, type: string }) => boolean): HandlerChainInterface<TState, TRootState, TArgs, TPayload, TAction>
-  pending(handler: ActionHandler<TState, ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TRootState, TArgs, TPayload, TAction>
-  fulfilled(handler: ActionHandler<TState, { payload: TPayload } & ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TRootState, TArgs, TPayload, TAction>
-  rejected(handler: ActionHandler<TState, { payload: Error } & ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TRootState, TArgs, TPayload, TAction>
-  finally(handler: ActionHandler<TState, ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TRootState, TArgs, TPayload, TAction>
+type ActionCreator<TArgs, TAction extends Action = Action, TPayload = any> = TArgs extends undefined
+  // ? (<T = TPayload>() => TAction)
+  ? ActionCreatorWithoutArgs<TAction, TPayload>
+  // : (<T = TPayload, A = TArgs>(args: A) => TAction)
+  : ActionCreatorWithArgs<TAction, TPayload, TArgs>
+
+interface HandlerClass<S, RS> extends InternalHandler<S> {
+  /**
+   * Handle existing action creator
+   */
+  handle<T, A, TA extends Action>(
+    a: ActionCreatorWithArgs<TA, T, A> | ActionCreatorWithoutArgs<TA, T>,
+    ...ops: AsyncOperator<RS, S, A, T, T>[]
+  ): void
 
   /**
-   * Creates action.
-   * Chain can continue to be used in other handlers.
+   * Creates new action creator
    */
-  build(): TAction & Action
-}
+  action<TArgs = undefined>(name?: string): {
+    /**
+     * Creates action without any handlers
+     */
+    empty(): ActionCreator<TArgs>
 
-enum HandlerType {
-  Promise,
-  Observable
-}
+    /**
+     * Handle sync actions
+     */
+    handle(handler: ActionHandler<S, Action & { args: TArgs }>): void
 
-const getRootChain = (parentChain: BaseHandlerChain): BaseHandlerChain =>
-  parentChain.parentChain
-    ? getRootChain(parentChain.parentChain)
-    : parentChain
+    /*
+     Generate `pipe` aliases:
 
-class HandlerChain<TState, TRootState, TArgs, TResult, TAction extends Action> implements HandlerChainInterface<TState, TRootState, TArgs, TResult, TAction> {
-  parentChain: BaseHandlerChain
-  type: string
+    for (let i = 1; i < 11; i++) {
+      let t: string[] = []
+      let a: string[] = []
+      let ops: string[] = []
 
-  private _isBuilt: boolean
-  private _promiseFn: PromiseFn<TRootState, TArgs, any>
-  private _observableFn: ObservableFn<TRootState, TArgs, any>
+      for (let j = 0; j < i + 1; j++) {
+        const n = j + 1
+        t.push(`T${n}`)
+        a.push(`A${n}`)
 
-  private _pendingCount: number = 0
-  private _fulfilledCount: number = 0
-  private _rejectedCount: number = 0
-  private _finallyCount: number = 0
-
-  private _available: AvailableFn
-  private _pending: ActionHandler<any, any, any>[] = []
-  private _fulfilled: ActionHandler<any, any, any>[] = []
-  private _rejected: ActionHandler<any, any, any>[] = []
-  private _finally: ActionHandler<any, any, any>[] = []
-
-  constructor(private _handler: HandlerData, typeOrChain: string | BaseHandlerChain, public hType?: HandlerType) {
-    if (typeof typeOrChain === 'string') {
-      this.type = typeOrChain
-    }
-    else {
-      this.parentChain = typeOrChain
-      this.type = typeOrChain.type
-      this.hType = typeOrChain.hType
-    }
-
-    if (process.env.NODE_ENV !== 'production')
-      if (this._handler.actionHandlers[this.type])
-        throw new Error(`Action "${this.type}" with the same name already exists`)
-
-    this._handler.actionHandlers[this.type] = (state, action: ActionSystem) => {
-      switch (action.__state) {
-        case Lifecycle.Pending:
-          state = callHandlers(this._pending, state, action)
-          break
-
-        case Lifecycle.Fulfilled:
-          state = callHandlers(this._fulfilled, state, action)
-          break
-
-        case Lifecycle.Rejected:
-          state = callHandlers(this._rejected, state, action)
-          break
-
-        case Lifecycle.Finally:
-          state = callHandlers(this._finally, state, action)
+        if (j !== i) {
+          ops.push(`op${n}: AsyncOperator<RS, S, TArgs, T${n}, T${n + 1}, A${n}, A${n + 1}>`)
+        }
       }
 
-      return state
-    }
-  }
-
-  call<P>(observableOrPromise: PromiseFn<TRootState, TArgs, P> | ObservableFn<TRootState, TArgs, P>): HandlerChainInterface<TState, TRootState, TArgs, P, TAction> {
-    if (this.hType === HandlerType.Observable) {
-      this._observableFn = observableOrPromise as ObservableFn<TRootState>
-    }
-    else if (this.hType === HandlerType.Promise) {
-      this._promiseFn = observableOrPromise as PromiseFn<TRootState, TArgs, P>
+      console.log(`pipe<${t.join(', ')}, ${a.join(', ')} extends Action>(${ops.join(', ')}): ActionCreator<TArgs, A${i + 1}, T${i + 1}>`)
     }
 
-    return this as any
+    */
+
+    /**
+     * Handle async actions
+     */
+    pipe<T1, T2, A1, A2 extends Action>(op1: AsyncOperator<RS, S, TArgs, T1, T2, A1, A2>): ActionCreator<TArgs, A2, T2>
+    pipe<T1, T2, T3, A1, A2, A3 extends Action>(op1: AsyncOperator<RS, S, TArgs, T1, T2, A1, A2>, op2: AsyncOperator<RS, S, TArgs, T2, T3, A2, A3>): ActionCreator<TArgs, A3, T3>
+    pipe<T1, T2, T3, T4, A1, A2, A3, A4 extends Action>(op1: AsyncOperator<RS, S, TArgs, T1, T2, A1, A2>, op2: AsyncOperator<RS, S, TArgs, T2, T3, A2, A3>, op3: AsyncOperator<RS, S, TArgs, T3, T4, A3, A4>): ActionCreator<TArgs, A4, T4>
+    pipe<T1, T2, T3, T4, T5, A1, A2, A3, A4, A5 extends Action>(op1: AsyncOperator<RS, S, TArgs, T1, T2, A1, A2>, op2: AsyncOperator<RS, S, TArgs, T2, T3, A2, A3>, op3: AsyncOperator<RS, S, TArgs, T3, T4, A3, A4>, op4: AsyncOperator<RS, S, TArgs, T4, T5, A4, A5>): ActionCreator<TArgs, A5, T5>
+    pipe<T1, T2, T3, T4, T5, T6, A1, A2, A3, A4, A5, A6 extends Action>(op1: AsyncOperator<RS, S, TArgs, T1, T2, A1, A2>, op2: AsyncOperator<RS, S, TArgs, T2, T3, A2, A3>, op3: AsyncOperator<RS, S, TArgs, T3, T4, A3, A4>, op4: AsyncOperator<RS, S, TArgs, T4, T5, A4, A5>, op5: AsyncOperator<RS, S, TArgs, T5, T6, A5, A6>): ActionCreator<TArgs, A6, T6>
+    pipe<T1, T2, T3, T4, T5, T6, T7, A1, A2, A3, A4, A5, A6, A7 extends Action>(op1: AsyncOperator<RS, S, TArgs, T1, T2, A1, A2>, op2: AsyncOperator<RS, S, TArgs, T2, T3, A2, A3>, op3: AsyncOperator<RS, S, TArgs, T3, T4, A3, A4>, op4: AsyncOperator<RS, S, TArgs, T4, T5, A4, A5>, op5: AsyncOperator<RS, S, TArgs, T5, T6, A5, A6>, op6: AsyncOperator<RS, S, TArgs, T6, T7, A6, A7>): ActionCreator<TArgs, A7, T7>
+    pipe<T1, T2, T3, T4, T5, T6, T7, T8, A1, A2, A3, A4, A5, A6, A7, A8 extends Action>(op1: AsyncOperator<RS, S, TArgs, T1, T2, A1, A2>, op2: AsyncOperator<RS, S, TArgs, T2, T3, A2, A3>, op3: AsyncOperator<RS, S, TArgs, T3, T4, A3, A4>, op4: AsyncOperator<RS, S, TArgs, T4, T5, A4, A5>, op5: AsyncOperator<RS, S, TArgs, T5, T6, A5, A6>, op6: AsyncOperator<RS, S, TArgs, T6, T7, A6, A7>, op7: AsyncOperator<RS, S, TArgs, T7, T8, A7, A8>): ActionCreator<TArgs, A8, T8>
+    pipe<T1, T2, T3, T4, T5, T6, T7, T8, T9, A1, A2, A3, A4, A5, A6, A7, A8, A9 extends Action>(op1: AsyncOperator<RS, S, TArgs, T1, T2, A1, A2>, op2: AsyncOperator<RS, S, TArgs, T2, T3, A2, A3>, op3: AsyncOperator<RS, S, TArgs, T3, T4, A3, A4>, op4: AsyncOperator<RS, S, TArgs, T4, T5, A4, A5>, op5: AsyncOperator<RS, S, TArgs, T5, T6, A5, A6>, op6: AsyncOperator<RS, S, TArgs, T6, T7, A6, A7>, op7: AsyncOperator<RS, S, TArgs, T7, T8, A7, A8>, op8: AsyncOperator<RS, S, TArgs, T8, T9, A8, A9>): ActionCreator<TArgs, A9, T9>
+    pipe<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10 extends Action>(op1: AsyncOperator<RS, S, TArgs, T1, T2, A1, A2>, op2: AsyncOperator<RS, S, TArgs, T2, T3, A2, A3>, op3: AsyncOperator<RS, S, TArgs, T3, T4, A3, A4>, op4: AsyncOperator<RS, S, TArgs, T4, T5, A4, A5>, op5: AsyncOperator<RS, S, TArgs, T5, T6, A5, A6>, op6: AsyncOperator<RS, S, TArgs, T6, T7, A6, A7>, op7: AsyncOperator<RS, S, TArgs, T7, T8, A7, A8>, op8: AsyncOperator<RS, S, TArgs, T8, T9, A8, A9>, op9: AsyncOperator<RS, S, TArgs, T9, T10, A9, A10>): ActionCreator<TArgs, A10, T10>
+    pipe<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11 extends Action>(op1: AsyncOperator<RS, S, TArgs, T1, T2, A1, A2>, op2: AsyncOperator<RS, S, TArgs, T2, T3, A2, A3>, op3: AsyncOperator<RS, S, TArgs, T3, T4, A3, A4>, op4: AsyncOperator<RS, S, TArgs, T4, T5, A4, A5>, op5: AsyncOperator<RS, S, TArgs, T5, T6, A5, A6>, op6: AsyncOperator<RS, S, TArgs, T6, T7, A6, A7>, op7: AsyncOperator<RS, S, TArgs, T7, T8, A7, A8>, op8: AsyncOperator<RS, S, TArgs, T8, T9, A8, A9>, op9: AsyncOperator<RS, S, TArgs, T9, T10, A9, A10>, op10: AsyncOperator<RS, S, TArgs, T10, T11, A10, A11>): ActionCreator<TArgs, A11, T11>
   }
-
-  available(fn: (getState: () => TRootState, other: { args: TArgs, type: string }) => boolean): HandlerChainInterface<TState, TRootState, TArgs, TResult, TAction> {
-    this._available = fn
-    return this
-  }
-
-  pending(handler: ActionHandler<TState, ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TRootState, TArgs, TResult, TAction> {
-    this._pending.push(handler)
-    this.getBaseChain()._pendingCount++
-    return this
-  }
-
-  fulfilled(handler: ActionHandler<TState, { payload: TResult } & ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TRootState, TArgs, TResult, TAction> {
-    this._fulfilled.push(handler)
-    this.getBaseChain()._fulfilledCount++
-    return this
-  }
-
-  rejected(handler: ActionHandler<TState, { payload: Error } & ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TRootState, TArgs, TResult, TAction> {
-    this._rejected.push(handler)
-    this.getBaseChain()._rejectedCount++
-    return this
-  }
-
-  finally(handler: ActionHandler<TState, ArgsAction<TArgs>, keyof TState>): HandlerChainInterface<TState, TRootState, TArgs, TResult, TAction> {
-    this._finally.push(handler)
-    this.getBaseChain()._finallyCount++
-    return this
-  }
-
-  build(): TAction & ActionType {
-    if (process.env.NODE_ENV !== 'production')
-      if (this._isBuilt)
-        throw new Error(`Chain already built. Check type "${this.type}"`)
-
-    this._isBuilt = true
-
-    // tslint:disable-next-line:no-object-literal-type-assertion
-    const action = (args?: any) => {
-      const a: ActionSystem = {
-        type: this.type,
-        args,
-        __state: Lifecycle.INIT,
-        __available: this._available,
-        __pending: this._pendingCount > 0,
-        __fulfilled: this._fulfilledCount > 0,
-        __rejected: this._rejectedCount > 0,
-        __finally: this._finallyCount > 0
-      }
-
-      if (this._promiseFn)
-        a.promise = this._promiseFn
-      else if (this._observableFn)
-        a.observable = this._observableFn
-
-      return a
-    }
-
-    (action as any as ActionType).type = this.type
-
-    return action as any
-  }
-
-  private getBaseChain = () =>
-    this.parentChain
-      ? getRootChain(this.parentChain)
-      : this
 }
 
-// tslint:disable-next-line:max-classes-per-file
-export class Handler<TState, TRootState = {}> {
-  private readonly _initialState: TState
-  private readonly _options: HandlerOptions
+interface HandlerOptions {
+  prefix?: string | string[]
+}
 
-  private readonly _data: HandlerData = {
-    actionHandlers: {}
+class Handler<TStore, TRootStore> implements HandlerClass<TStore, TRootStore> {
+
+  private get nextActionType() {
+    if (!this._typeGenerator)
+      this._typeGenerator = actionTypeGenerator(this._prefix)
+
+    return this._typeGenerator.next().value
   }
+  static readonly prefixIterator = prefixGenerator()
 
-  constructor(initialState: TState, options: HandlerOptions = {}) {
+  readonly actionHandlers: { [id: string]: ActionHandler<TStore, Action> } = {}
+
+  private readonly _initialState: TStore
+  private readonly _prefix: string
+  private _typeGenerator: IterableIterator<string> | undefined
+
+  constructor(initialState: TStore, options: HandlerOptions) {
     this._initialState = initialState
-    this._options = options
+
+    const prefix = options.prefix
+
+    this._prefix = prefix
+      ? `${typeof prefix === 'string' ? prefix : prefix.join('/')}`
+      : Handler.prefixIterator.next().value
   }
 
-  /**
-   * Handle action or chain
-   */
-  handle<A extends AnyAction>(type: string, handler: ActionHandler<TState, A, keyof TState>): void
-  handle(fn: (() => Action) & ActionType, handler: ActionHandler<TState, Action, keyof TState>): void
-  handle<T>(fn: ((args: any) => SyncAction<T>) & ActionType, handler: ActionHandler<TState, SyncAction<T>, keyof TState>): void
-  handle<TRefState, TArgs, TMeta, TResult, TAction extends Action>(chain: HandlerChainInterface<TRefState, TRootState, TArgs, TResult, TAction>): HandlerChainInterface<TState, TRootState, TArgs, TResult, TAction>
-  handle(typeOrChain: string | HandlerChainInterface<TState, TRootState> | ActionType, handler?: ActionHandler<TState, any, keyof TState>) {
-    if (typeof typeOrChain === 'string') {
-      this._data.actionHandlers[typeOrChain] = handler!
-      return
+  handle(fn: ActionCreator<any>, ...operators: AsyncOperator[]) {
+    if (fn[FACTORY_SYM].type === FactoryType.Pipe) {
+      const chain = new HandlerChain<TStore>()
+
+      const initEventArgs: AsyncOperatorOnInitEvent<TStore> = {
+        chain,
+        handler: this
+      }
+
+      for (const op of operators)
+        if (op.hooks.init)
+          op.hooks.init(initEventArgs)
+
+      this.actionHandlers[fn.TYPE] = (
+        (state, action: InternalAction) => {
+          const handler = chain.asyncActionHandlers[action[META_SYM].state]
+
+          return handler
+            ? callHandlers(handler, state, action)
+            : state
+        }
+      ) as ActionHandler<TStore, Action>
     }
-    else if (typeof (typeOrChain as HandlerChainInterface<TState, TRootState>).fulfilled === 'function') {
-      const chain = typeOrChain as BaseHandlerChain
-      return new HandlerChain<TState, TRootState, any, any, any>(this._data, chain) as HandlerChainInterface<any, any, any, any>
+  }
+
+  action<A = undefined>(name?: string): {
+    empty(): ActionCreator<A>
+    handle(handler: ActionHandler<TStore, Action & { args: A }>): ActionCreator<A>
+    pipe<T>(...operators: AsyncOperator<TRootStore, TStore, A, T>[]): ActionCreator<A>
+  } {
+    const type = name != null
+      ? `${this._prefix}/${name}`
+      : this.nextActionType
+
+    return {
+      empty: () => this.empty(type),
+      handle: hr => this.sync(type, hr),
+      pipe: (fn, ...ops) => this.pipe(type, fn, ...ops)
     }
-    else {
-      this._data.actionHandlers[(typeOrChain as ActionType).type] = handler!
-      return
-    }
   }
 
-  action(type: string, handler: ActionHandler<TState, Action, keyof TState>): (() => Action) & ActionType
-  action<A>(type: string, handler: ActionHandler<TState, SyncAction<A>, keyof TState>): ((args: A) => SyncAction<A>) & ActionType
-  action(type: string, handler: ActionHandler<TState, any, keyof TState>) {
-    const realType = this.getActionType(type)
-    const action = (payload?: any) => ({ type: realType, payload })
-    const modifiedAction: typeof action & ActionType = action as any
-
-    this._data.actionHandlers[realType] = handler
-    modifiedAction.type = realType
-
-    return modifiedAction
-  }
-
-  promise(type: string): HandlerChainPromise<TState, TRootState, never, (() => PromiseAction<any, {}> & Action) & ActionType>
-  promise<A extends {}>(type: string): HandlerChainPromise<TState, TRootState, A, ((args: A) => PromiseAction<any, A> & ArgsAction<A>) & ActionType>
-  promise(type: string): HandlerChainPromise<TState, TRootState, any, any> {
-    return new HandlerChain(this._data, this.getActionType(type), HandlerType.Promise)
-  }
-
-  /**
-   * Handles items from observable stream except actions.
-   * `{ type: string }` items will be skipped.
-   */
-  observable(type: string): HandlerChainObservable<TState, TRootState, any, (() => ObservableAction<any, {}>) & ActionType>
-  observable<A extends {}>(type: string): HandlerChainObservable<TState, TRootState, A, ((args: A) => ObservableAction<any, A>) & ActionType>
-  observable(type: string): HandlerChainObservable<TState, TRootState, any, any> {
-    return new HandlerChain(this._data, this.getActionType(type), HandlerType.Observable)
-  }
-
-  buildReducer(): Reducer<TState> {
+  buildReducer(): Reducer<TStore> {
     return (state = this._initialState, action: Action) =>
-      this._data.actionHandlers[action.type]
-        ? this._data.actionHandlers[action.type](state, action)
-        : state as any
+      this.actionHandlers[action.type]
+        ? this.actionHandlers[action.type](state, action)
+        : state
   }
 
-  private getActionType(type: string) {
-    const prefix = this._options.prefix
+  private empty<A>(type: string) {
+    return (() => ({ type })) as ActionCreator<A>
+  }
 
-    if (prefix)
-      type = `${typeof prefix === 'string' ? prefix : prefix.join('/')}/${type}`
+  private sync<A>(type: string, fn: ActionHandler<TStore, Action & { args: A }>): ActionCreator<A> {
+    this.actionHandlers[type] = fn as ActionHandler<TStore, Action>
 
-    return type
+    const action: (args?: any) => ArgsAction =
+      args => ({ type, args })
+
+    return action as ActionCreator<A, ArgsAction>
+  }
+
+  private pipe<A, T>(type: string, ...operators: AsyncOperator<TRootStore, TStore, A, T>[]): ActionCreator<A, Action> {
+    const chain = new HandlerChain<TStore>()
+
+    // #region On init
+
+    const initEventArgs: AsyncOperatorOnInitEvent<TStore> = {
+      chain,
+      handler: this
+    }
+
+    for (const op of operators)
+      if (op.hooks.init)
+        op.hooks.init(initEventArgs)
+
+    // #endregion
+
+    this.actionHandlers[type] = (
+      (state, action: InternalAction) => {
+        const handler = chain.asyncActionHandlers[action[META_SYM].state]
+
+        const s = handler
+          ? callHandlers(handler, state, action)
+          : state
+
+        return s
+      }
+    ) as ActionHandler<TStore, Action>
+
+    // #region On action creating
+
+    const actionCreatorEventArgs: AsyncOperatorOnActionCreatingEvent<TStore> = {
+      chain,
+      handler: this,
+      action: {
+        type,
+        [ARGS_SYM]: null,
+        [META_SYM]: {
+          operators,
+          state: Lifecycle.INIT,
+          async: {
+            pending: chain.asyncActionHandlers[Lifecycle.Pending].length > 0,
+            fulfilled: chain.asyncActionHandlers[Lifecycle.Fulfilled].length > 0,
+            rejected: chain.asyncActionHandlers[Lifecycle.Rejected].length > 0,
+            finally: chain.asyncActionHandlers[Lifecycle.Finally].length > 0,
+          }
+        }
+      }
+    }
+
+    const ac = ((args?: A) => {
+      let internalAction: InternalAction | undefined
+
+      for (const op of operators)
+        if (op.hooks.action) {
+          const res = op.hooks.action(actionCreatorEventArgs)
+
+          if (res) {
+            if (process.env.NODE_ENV !== 'production') {
+              if (internalAction)
+                throw new TypeError('`ActionCreator` returns action multiple times. Perhaps you add a few main operators. Check your pipe.')
+            }
+
+            internalAction = res
+          }
+        }
+
+      if (!internalAction)
+        throw new TypeError('`InitHook` never returned an action. Perhaps you forgot to add the main operator. Check your pipe.')
+
+
+      internalAction![ARGS_SYM] = args
+      return internalAction
+    }) as ActionCreator<A, InternalAction>
+
+    // #endregion
+
+    const factory: Factory = ac as any
+
+    factory.TYPE = type
+    factory[FACTORY_SYM] = {
+      type: FactoryType.Pipe
+    }
+
+    return ac
   }
 }
+
+export default <TStore, TRootStore = never>(initialState: TStore, options: HandlerOptions = {}) =>
+  new Handler<TStore, TRootStore>(initialState, options) as HandlerClass<TStore, TRootStore>

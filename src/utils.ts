@@ -1,10 +1,14 @@
 import { Action } from 'redux'
-import { ActionSystem } from './handler'
+import { InternalAction, META_SYM } from './types'
 
 /**
  * Action sanitizer for __REDUX_DEVTOOLS_EXTENSION_COMPOSE__
  */
-export const actionSanitizer: (action: Action) => Action = (action: ActionSystem) =>
-  action.__state
-    ? ({ ...action, type: `${action.type} [ ${action.__state.toUpperCase()} ]` })
-    : action
+export const actionSanitizer: (action: Action) => Action =
+  action => {
+    const meta = (action as InternalAction)[META_SYM]
+
+    return meta.state !== undefined
+      ? ({ ...action, type: `${action.type} [ ${meta.state.toUpperCase()} ]` })
+      : action
+  }

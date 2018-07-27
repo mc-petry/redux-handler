@@ -28,6 +28,10 @@
       true,
       2
     ],
+    "no-implicit-dependencies": [
+      true,
+      ["redux-handler", "rxjs"]
+    ],
     "eofline": false,
     "object-literal-sort-keys": false,
     "one-line": [
