@@ -1,16 +1,16 @@
 import { ActionHandler, Lifecycle, Action } from '../types'
-import { AsyncOperator } from '../api'
+import { HOperator } from '../api'
 
 export interface FulfilledAction<A = any, T = any> extends Action {
   args: A
-  payload: T
+  payload: Exclude<T, Action>
 }
 
 /**
- * Occurs after async method succeeds
+ * Occurs on async method succeeds
  */
 export const fulfilled = <RS, S, TArgs, T, A>(hr: ActionHandler<S, FulfilledAction<TArgs, T>>):
-  AsyncOperator<RS, S, TArgs, T, T, A, A> =>
+  HOperator<RS, S, TArgs, T, T, A, A> =>
   ({
     hooks: {
       init: ({ chain }) => {

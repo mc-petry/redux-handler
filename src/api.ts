@@ -1,48 +1,48 @@
 import { InternalAction, Action, InternalHandler } from './types'
 import { Dispatch } from 'redux'
 import { MiddlewareOptions } from './middleware'
-import { HandlerChain } from './handler-chain'
+import { HandlerChain } from './internal/handler-chain'
 
-export interface AsyncOperatorOnHandlerBaseEvent<TStore> {
+export interface HOperatorOnHandlerBaseEvent<TStore> {
   readonly handler: InternalHandler<TStore>
   readonly chain: HandlerChain<TStore>
 }
 
-export interface AsyncOperatorOnInitEvent<TStore> extends AsyncOperatorOnHandlerBaseEvent<TStore> {
+export interface HOperatorOnInitEvent<TStore> extends HOperatorOnHandlerBaseEvent<TStore> {
 }
 
-export interface AsyncOperatorOnActionCreatingEvent<TStore> extends AsyncOperatorOnHandlerBaseEvent<TStore> {
+export interface HOperatorOnActionCreatingEvent<TStore> extends HOperatorOnHandlerBaseEvent<TStore> {
   /**
    * Base action. You must extends it on your own.
    */
   readonly action: InternalAction
 }
 
-interface AsyncOperatorOnMiddlewareBaseEvent<TRootStore> {
+interface HOperatorOnMiddlewareBaseEvent<TRootStore> {
   readonly dispatch: Dispatch<Action>
   readonly options: MiddlewareOptions
   readonly getState: () => TRootStore
 }
 
-export interface AsyncOperatorOnBeforeNextEvent<TRootStore, TAction extends InternalAction = InternalAction> extends AsyncOperatorOnMiddlewareBaseEvent<TRootStore> {
+export interface HOperatorOnBeforeNextEvent<TRootStore, TAction extends InternalAction = InternalAction> extends HOperatorOnMiddlewareBaseEvent<TRootStore> {
   readonly action: TAction
   readonly defaultPrevented: boolean
 
   preventDefault(): void
 }
 
-export interface AsyncOperatorOnNextEvent<TRootStore, TAction extends InternalAction = InternalAction> extends AsyncOperatorOnMiddlewareBaseEvent<TRootStore> {
+export interface HOperatorOnAfterNextEvent<TRootStore, TAction extends InternalAction = InternalAction> extends HOperatorOnMiddlewareBaseEvent<TRootStore> {
   /**
    * You can replace returns `action` in middleware
    */
   readonly action: TAction
 }
-export type InitHook<TStore> = (e: AsyncOperatorOnInitEvent<TStore>) => void
-export type ActionHook<TStore, A extends InternalAction = InternalAction> = (e: AsyncOperatorOnActionCreatingEvent<TStore>) => A
-export type BeforeNextHook<TRootStore> = (e: AsyncOperatorOnBeforeNextEvent<TRootStore>) => void | any
-export type AfterNextHook<TRootStore> = (e: AsyncOperatorOnNextEvent<TRootStore>) => void | any
+export type InitHook<TStore> = (e: HOperatorOnInitEvent<TStore>) => void
+export type ModifyActionHook<TStore, A extends InternalAction = InternalAction> = (e: HOperatorOnActionCreatingEvent<TStore>) => A
+export type BeforeNextHook<TRootStore> = (e: HOperatorOnBeforeNextEvent<TRootStore>) => void | any
+export type AfterNextHook<TRootStore> = (e: HOperatorOnAfterNextEvent<TRootStore>) => void | any
 
-export interface AsyncOperator<TRootStore = any, TStore = any, TArgs = any, TPayload = any, TResult = any, TAction = any, TNextAction = any> {
+export interface HOperator<TRootStore = any, TStore = any, TArgs = any, TPayload = any, TResult = any, TAction = any, TNextAction = any> {
   hooks: {
     /**
      * Occurs on action creating.
@@ -51,9 +51,9 @@ export interface AsyncOperator<TRootStore = any, TStore = any, TArgs = any, TPay
     init?: InitHook<TStore>
 
     /**
-     * Only single operator in pipeline must return action
+     * Only single operator in pipeline must modify
      */
-    action?: ActionHook<TStore>
+    modifyAction?: ModifyActionHook<TStore>
 
     /**
      * Occurs before next action will be dispatched

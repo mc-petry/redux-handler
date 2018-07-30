@@ -1,7 +1,7 @@
 {
   "name": "redux-handler",
   "version": "0.10.0",
-  "description": "Redux reduce boilerplate library",
+  "description": "Redux handler. Alternative for redux-saga / redux-observable",
   "main": "dist/index.js",
   "typings": "dist/index",
   "dependencies": {},
@@ -17,14 +17,12 @@
     "typescript": "3.0.0-rc"
   },
   "peerDependencies": {
-    "redux": "^4.0.0"
-  },
-  "optionalDependencies": {
+    "redux": "^4.0.0",
     "rxjs": "^6.2.2"
   },
   "scripts": {
     "test": "jest",
-    "build": "tsc",
+    "build": "tsc -p tsconfig.json",
     "clean": "rimraf dist",
     "prepare": "run-s clean build",
     "watch": "tsc -w"

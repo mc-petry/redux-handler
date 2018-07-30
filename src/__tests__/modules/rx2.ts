@@ -14,5 +14,5 @@ rxHandler2
   .handle(
     baseRx,
     pending((s, a) => ({ ...s, pending2: a.args.data })),
-    fulfilled((s, a) => ({ ...s, fulfilled2ed: a.args.data + a.payload.result }))
+    fulfilled((s, a) => ({ ...s, fulfilled2: a.args.data + a.payload.result }))
   )

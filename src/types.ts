@@ -1,5 +1,5 @@
 import { Action as ReduxAction, Reducer } from 'redux'
-import { AsyncOperator } from './api'
+import { HOperator } from './api'
 
 export const ARGS_SYM = Symbol('args')
 export const META_SYM = Symbol('meta')
@@ -11,7 +11,7 @@ export interface ArgsAction extends Action {
 }
 
 interface AsyncActionMeta {
-  operators: AsyncOperator[]
+  operators: HOperator[]
   state: Lifecycle
 
   /**
@@ -21,7 +21,7 @@ interface AsyncActionMeta {
     pending: boolean
     fulfilled: boolean
     rejected: boolean
-    finally: boolean
+    completed: boolean
   }
 }
 
@@ -35,7 +35,7 @@ export const enum Lifecycle {
   Pending = 'pending',
   Fulfilled = 'fulfilled',
   Rejected = 'rejected',
-  Finally = 'finally'
+  Completed = 'completed'
 }
 
 export interface InternalHandler<TStore = any> {

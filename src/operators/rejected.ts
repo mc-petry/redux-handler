@@ -1,5 +1,5 @@
 import { ActionHandler, Lifecycle, Action } from '../types'
-import { AsyncOperator } from '../api'
+import { HOperator } from '../api'
 
 export interface RejectedAction<A = any> extends Action {
   error: any
@@ -7,10 +7,10 @@ export interface RejectedAction<A = any> extends Action {
 }
 
 /**
- * Occurs after async method failed
+ * Occurs on async method failed
  */
 export const rejected = <RS, S, TArgs, T, A>(hr: ActionHandler<S, RejectedAction<TArgs>>):
-  AsyncOperator<RS, S, TArgs, T, T, A, A> =>
+  HOperator<RS, S, TArgs, T, T, A, A> =>
   ({
     hooks: {
       init: ({ chain }) => {

@@ -17,9 +17,11 @@ export const errorHandler = ({ options, error, action, dispatch }: {
     }
   }
   else {
-    // tslint:disable:no-console
-    console.warn('Register `Error Handler` on middleware to handle errors')
-    console.error(error)
-    // tslint:enable:no-console
+    if (process.env.NODE_ENV !== 'production') {
+      // tslint:disable:no-console
+      console.warn(`Register 'Error Handler' on middleware to handle errors. The following error not handled:`)
+      console.error(error)
+      // tslint:enable:no-console
+    }
   }
 }

@@ -1,13 +1,14 @@
 import { Lifecycle, Action, META_SYM, InternalAction, ARGS_SYM } from '../types'
 import { mergeMap, finalize } from 'rxjs/operators'
 import { errorHandler } from '../internal/error-handler'
-import { AsyncOperator, BeforeNextHook, AfterNextHook } from '../api'
+import { HOperator, BeforeNextHook } from '../api'
 import { Subject, Subscription, Observable, EMPTY } from 'rxjs'
 import { mutateInternalAction } from '../internal/utils'
 import { PendingAction } from './pending'
 import { FulfilledAction } from './fulfilled'
 import { RejectedAction } from './rejected'
-import { FinalizeAction } from './finalize'
+import { CompletedAction } from './completed'
+import { HandlerPlugin, PluginOnNextHookEvent } from '../plugin-api'
 
 declare module 'redux' {
   interface Dispatch<A extends Action = AnyAction> {
@@ -51,11 +52,17 @@ interface RxInternalAction extends InternalAction, RxAction {
   }
 }
 
-/**
- * Global stream
- * Only actions with rx passed through
- */
-const action$ = new Subject<Action>()
+class RxPlugin implements HandlerPlugin {
+  /**
+   * Root stream. All actions passed though it.
+   * Applies after first usage of rx operator
+   */
+  readonly action$ = new Subject<Action>()
+
+  onNext(e: PluginOnNextHookEvent) {
+    this.action$.next(e.action)
+  }
+}
 
 const beforeNext: BeforeNextHook<any> = ({ dispatch, action, options, getState, defaultPrevented }) => {
   const meta = action[META_SYM]
@@ -75,7 +82,19 @@ const beforeNext: BeforeNextHook<any> = ({ dispatch, action, options, getState, 
   if (meta.async.pending)
     dispatch(mutateInternalAction<PendingAction>(action, Lifecycle.Pending, { args }))
 
-  const subscription = rxmeta.fn(args, { getState, action$, type: action.type })
+  // #region Find RxPlugin
+
+  let plugin = options.plugins.find(x => x instanceof RxPlugin) as RxPlugin
+
+  if (!plugin) {
+    // Explicitly register plugin
+    plugin = new RxPlugin()
+    options.plugins.push(plugin)
+  }
+
+  // #endregion
+
+  const subscription = rxmeta.fn(args, { getState, action$: plugin.action$, type: action.type })
     .pipe(
       mergeMap((output: Action) => {
         if (output === undefined)
@@ -94,8 +113,8 @@ const beforeNext: BeforeNextHook<any> = ({ dispatch, action, options, getState, 
       }),
 
       finalize(() => {
-        if (meta.async.finally)
-          dispatch(mutateInternalAction<FinalizeAction>(action, Lifecycle.Finally, { args }))
+        if (meta.async.completed)
+          dispatch(mutateInternalAction<CompletedAction>(action, Lifecycle.Completed, { args }))
       })
     )
     .subscribe(
@@ -115,13 +134,12 @@ const beforeNext: BeforeNextHook<any> = ({ dispatch, action, options, getState, 
   return subscription
 }
 
-const afterNext: AfterNextHook<any> = ({ action }) => {
-  action$.next(action)
-}
-
-export const rx = <RS, S, A, T>(fn: RxFn<RS, S, A, T>): AsyncOperator<RS, S, A, T, T, any, RxAction> => ({
+/**
+ * Handle rxjs observable
+ */
+export const rx = <RS, S, A, T>(fn: RxFn<RS, S, A, T>): HOperator<RS, S, A, T, T, any, RxAction> => ({
   hooks: {
-    action: e => {
+    modifyAction: e => {
       const action: RxInternalAction = {
         ...e.action,
         rx: true,
@@ -130,7 +148,6 @@ export const rx = <RS, S, A, T>(fn: RxFn<RS, S, A, T>): AsyncOperator<RS, S, A, 
 
       return action
     },
-    beforeNext,
-    afterNext
+    beforeNext
   }
 })

@@ -1,4 +1,4 @@
-import { InternalAction, META_SYM, Lifecycle, ActionHandler } from '../types'
+import { InternalAction, META_SYM, Lifecycle } from '../types'
 
 /**
  * Creates a copy of internal action with

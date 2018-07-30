@@ -1,6 +1,6 @@
 import { handler } from '../..'
-import { of } from 'rxjs'
-import { pending, fulfilled, rejected, finalize, loading, available } from '../../operators'
+import { of, concat } from 'rxjs'
+import { pending, fulfilled, rejected, completed, loading, available } from '../../operators'
 import { RootStore } from '../store'
 import { tap, takeUntil, filter, delay } from 'rxjs/operators'
 import { rx } from '../../operators/rx'
@@ -13,6 +13,10 @@ export interface RxStoreA {
   loading?: boolean
   notavailable: string
   prevent?: string
+
+  milk?: number
+  yoghurt?: number
+  cheese?: number
 }
 
 const initialState: RxStoreA = {
@@ -40,24 +44,47 @@ export const baseRx = rxHandler
     fulfilled((s, a) => ({ ...s, fulfilled: a.args.data + a.payload.result })),
     pending((s, a) => ({ ...s, pending: a.args.data })),
     rejected((s, a) => ({ ...s, rejected: a.error })),
-    finalize((s, a) => ({ ...s, finalize: a.args.data })),
+    completed((s, a) => ({ ...s, finalize: a.args.data })),
     loading('loading')
   )
 
 export const stopRx = rxHandler
-  .action()
-  .pipe(
-    rx((_, { type }) => of({ stop: type }))
-  )
+  .action('STOP_RX')
+  .empty()
 
 export const preventedRx = rxHandler
   .action()
   .pipe(
-    rx((_, { action$ }) => of({ xt: '123' })
+    rx((_, { action$ }) => of({ xt: 'data' })
       .pipe(
-        delay(200),
+        delay(300),
         takeUntil(action$.pipe(filter(x => x.type === stopRx.TYPE)))
       )
     ),
-    fulfilled(s => ({ ...s, prevent: 'data' }))
+    fulfilled((s, a) => ({ ...s, prevent: a.payload.xt }))
+  )
+
+// ---------------------------------
+// --- dispatch action in action ---
+// ---------------------------------
+
+export const produceYoghurt = rxHandler
+  .action()
+  .handle(s => ({ ...s, yoghurt: s.milk / 2 }))
+
+export const produceCheese = rxHandler
+  .action()
+  .handle(s => ({ ...s, cheese: s.milk / 5 }))
+
+export const getMilk = rxHandler
+  .action()
+  .pipe(
+    rx(
+      () => concat(
+        of({ liters: 10 }),
+        of(produceYoghurt()),
+        of(produceCheese())
+      )
+    ),
+    fulfilled((s, { payload }) => ({ ...s, milk: payload.liters }))
   )

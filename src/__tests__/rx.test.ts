@@ -1,5 +1,5 @@
 import { store } from './store'
-import { baseRx, preventedRx, stopRx } from './modules/rx'
+import { baseRx, preventedRx, stopRx, getMilk } from './modules/rx'
 import { RxAction } from '../operators/rx'
 import { timer } from 'rxjs'
 
@@ -41,12 +41,21 @@ describe('rx', () => {
     }))
 
     it('prevent async operator', () => {
-      timer(100).subscribe(()  => store.dispatch(stopRx()))
+      timer(100).subscribe(() => store.dispatch(stopRx()))
+
       return testRx(preventedRx(), () => {
         const state = getState()
 
         expect(state.prevent).not.toBe('data')
       })()
     })
+
+    it('dispatch action in action', testRx(getMilk(), () => {
+      const state = getState()
+
+      expect(state.milk).toBe(10)
+      expect(state.yoghurt).toBe(5)
+      expect(state.cheese).toBe(2)
+    }))
   })
 })
