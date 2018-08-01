@@ -11,22 +11,11 @@ const callHandlers = <TState>(handlers: ActionHandler<TState, Action>[], state: 
   return state
 }
 
-const FACTORY_SYM = Symbol('factory')
-
-const enum FactoryType {
-  Sync = 1,
-  Pipe = 2
-}
-
 interface Factory {
   /**
    * Action type
    */
   TYPE: string
-
-  [FACTORY_SYM]: {
-    type: FactoryType
-  }
 }
 
 type ActionCreatorWithoutArgs<TAction, TPayload> = (() => TAction) & Factory
@@ -34,23 +23,23 @@ type ActionCreatorWithArgs<TAction, TPayload, TArgs> = ((args: TArgs) => TAction
 
 /**
  * We needs explicit Action Creator types to infer TArgs & TPayload
+ * Also we split sync and async action creators to have full intellisence
  */
-type ActionCreator<TArgs, TAction extends Action = Action, TPayload = any> = TArgs extends undefined
+type ActionCreator<TArgs, TAction extends Action = Action, TPayload = undefined> = TArgs extends undefined
   // ? (<T = TPayload>() => TAction)
   ? ActionCreatorWithoutArgs<TAction, TPayload>
   // : (<T = TPayload, A = TArgs>(args: A) => TAction)
   : ActionCreatorWithArgs<TAction, TPayload, TArgs>
 
-type PipeActionCreator<TArgs, TAction extends Action = Action, TPayload = any> = ActionCreator<TArgs, TAction, TPayload>
+type SyncActionCreator<TArgs, TAction extends Action = Action> = ActionCreator<TArgs, TAction, never> & { SYNC: true }
+type AsyncActionCreator<TArgs = undefined, TAction extends Action = Action, TPayload = never> = ActionCreator<TArgs, TAction, TPayload> & { ASYNC: true }
 
 interface HandlerClass<S, RS> extends InternalHandler<S> {
   /**
    * Handle existing action creator
    */
-  handle<T, A, TA extends Action>(
-    a: ActionCreatorWithArgs<TA, T, A> | ActionCreatorWithoutArgs<TA, T>,
-    ...ops: HOperator<RS, S, A, T, T>[]
-  ): void
+  handle<A, TA extends Action>(a: SyncActionCreator<A, TA>, handler: ActionHandler<S, Action & { args: A }>): void
+  handle<T, A, TA extends Action>(a: AsyncActionCreator<A, TA, T>, ...ops: HOperator<RS, S, A, T, T>[]): void
 
   /**
    * Creates new action creator
@@ -64,7 +53,7 @@ interface HandlerClass<S, RS> extends InternalHandler<S> {
     /**
      * Handle sync actions
      */
-    handle(handler: ActionHandler<S, Action & { args: TArgs }>): ActionCreator<TArgs>
+    handle(handler: ActionHandler<S, Action & { args: TArgs }>): SyncActionCreator<TArgs>
 
     /*
      Generate `pipe` aliases:
@@ -92,16 +81,16 @@ interface HandlerClass<S, RS> extends InternalHandler<S> {
     /**
      * Handle async actions
      */
-    pipe<T1, T2, A1, A2 extends Action>(op1: HOperator<RS, S, TArgs, T1, T2, A1, A2>): PipeActionCreator<TArgs, A2, T2>
-    pipe<T1, T2, T3, A1, A2, A3 extends Action>(op1: HOperator<RS, S, TArgs, T1, T2, A1, A2>, op2: HOperator<RS, S, TArgs, T2, T3, A2, A3>): PipeActionCreator<TArgs, A3, T3>
-    pipe<T1, T2, T3, T4, A1, A2, A3, A4 extends Action>(op1: HOperator<RS, S, TArgs, T1, T2, A1, A2>, op2: HOperator<RS, S, TArgs, T2, T3, A2, A3>, op3: HOperator<RS, S, TArgs, T3, T4, A3, A4>): PipeActionCreator<TArgs, A4, T4>
-    pipe<T1, T2, T3, T4, T5, A1, A2, A3, A4, A5 extends Action>(op1: HOperator<RS, S, TArgs, T1, T2, A1, A2>, op2: HOperator<RS, S, TArgs, T2, T3, A2, A3>, op3: HOperator<RS, S, TArgs, T3, T4, A3, A4>, op4: HOperator<RS, S, TArgs, T4, T5, A4, A5>): PipeActionCreator<TArgs, A5, T5>
-    pipe<T1, T2, T3, T4, T5, T6, A1, A2, A3, A4, A5, A6 extends Action>(op1: HOperator<RS, S, TArgs, T1, T2, A1, A2>, op2: HOperator<RS, S, TArgs, T2, T3, A2, A3>, op3: HOperator<RS, S, TArgs, T3, T4, A3, A4>, op4: HOperator<RS, S, TArgs, T4, T5, A4, A5>, op5: HOperator<RS, S, TArgs, T5, T6, A5, A6>): PipeActionCreator<TArgs, A6, T6>
-    pipe<T1, T2, T3, T4, T5, T6, T7, A1, A2, A3, A4, A5, A6, A7 extends Action>(op1: HOperator<RS, S, TArgs, T1, T2, A1, A2>, op2: HOperator<RS, S, TArgs, T2, T3, A2, A3>, op3: HOperator<RS, S, TArgs, T3, T4, A3, A4>, op4: HOperator<RS, S, TArgs, T4, T5, A4, A5>, op5: HOperator<RS, S, TArgs, T5, T6, A5, A6>, op6: HOperator<RS, S, TArgs, T6, T7, A6, A7>): PipeActionCreator<TArgs, A7, T7>
-    pipe<T1, T2, T3, T4, T5, T6, T7, T8, A1, A2, A3, A4, A5, A6, A7, A8 extends Action>(op1: HOperator<RS, S, TArgs, T1, T2, A1, A2>, op2: HOperator<RS, S, TArgs, T2, T3, A2, A3>, op3: HOperator<RS, S, TArgs, T3, T4, A3, A4>, op4: HOperator<RS, S, TArgs, T4, T5, A4, A5>, op5: HOperator<RS, S, TArgs, T5, T6, A5, A6>, op6: HOperator<RS, S, TArgs, T6, T7, A6, A7>, op7: HOperator<RS, S, TArgs, T7, T8, A7, A8>): PipeActionCreator<TArgs, A8, T8>
-    pipe<T1, T2, T3, T4, T5, T6, T7, T8, T9, A1, A2, A3, A4, A5, A6, A7, A8, A9 extends Action>(op1: HOperator<RS, S, TArgs, T1, T2, A1, A2>, op2: HOperator<RS, S, TArgs, T2, T3, A2, A3>, op3: HOperator<RS, S, TArgs, T3, T4, A3, A4>, op4: HOperator<RS, S, TArgs, T4, T5, A4, A5>, op5: HOperator<RS, S, TArgs, T5, T6, A5, A6>, op6: HOperator<RS, S, TArgs, T6, T7, A6, A7>, op7: HOperator<RS, S, TArgs, T7, T8, A7, A8>, op8: HOperator<RS, S, TArgs, T8, T9, A8, A9>): PipeActionCreator<TArgs, A9, T9>
-    pipe<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10 extends Action>(op1: HOperator<RS, S, TArgs, T1, T2, A1, A2>, op2: HOperator<RS, S, TArgs, T2, T3, A2, A3>, op3: HOperator<RS, S, TArgs, T3, T4, A3, A4>, op4: HOperator<RS, S, TArgs, T4, T5, A4, A5>, op5: HOperator<RS, S, TArgs, T5, T6, A5, A6>, op6: HOperator<RS, S, TArgs, T6, T7, A6, A7>, op7: HOperator<RS, S, TArgs, T7, T8, A7, A8>, op8: HOperator<RS, S, TArgs, T8, T9, A8, A9>, op9: HOperator<RS, S, TArgs, T9, T10, A9, A10>): PipeActionCreator<TArgs, A10, T10>
-    pipe<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11 extends Action>(op1: HOperator<RS, S, TArgs, T1, T2, A1, A2>, op2: HOperator<RS, S, TArgs, T2, T3, A2, A3>, op3: HOperator<RS, S, TArgs, T3, T4, A3, A4>, op4: HOperator<RS, S, TArgs, T4, T5, A4, A5>, op5: HOperator<RS, S, TArgs, T5, T6, A5, A6>, op6: HOperator<RS, S, TArgs, T6, T7, A6, A7>, op7: HOperator<RS, S, TArgs, T7, T8, A7, A8>, op8: HOperator<RS, S, TArgs, T8, T9, A8, A9>, op9: HOperator<RS, S, TArgs, T9, T10, A9, A10>, op10: HOperator<RS, S, TArgs, T10, T11, A10, A11>): PipeActionCreator<TArgs, A11, T11>
+    pipe<T1, T2, A1, A2 extends Action>(op1: HOperator<RS, S, TArgs, T1, T2, A1, A2>): AsyncActionCreator<TArgs, A2, T2>
+    pipe<T1, T2, T3, A1, A2, A3 extends Action>(op1: HOperator<RS, S, TArgs, T1, T2, A1, A2>, op2: HOperator<RS, S, TArgs, T2, T3, A2, A3>): AsyncActionCreator<TArgs, A3, T3>
+    pipe<T1, T2, T3, T4, A1, A2, A3, A4 extends Action>(op1: HOperator<RS, S, TArgs, T1, T2, A1, A2>, op2: HOperator<RS, S, TArgs, T2, T3, A2, A3>, op3: HOperator<RS, S, TArgs, T3, T4, A3, A4>): AsyncActionCreator<TArgs, A4, T4>
+    pipe<T1, T2, T3, T4, T5, A1, A2, A3, A4, A5 extends Action>(op1: HOperator<RS, S, TArgs, T1, T2, A1, A2>, op2: HOperator<RS, S, TArgs, T2, T3, A2, A3>, op3: HOperator<RS, S, TArgs, T3, T4, A3, A4>, op4: HOperator<RS, S, TArgs, T4, T5, A4, A5>): AsyncActionCreator<TArgs, A5, T5>
+    pipe<T1, T2, T3, T4, T5, T6, A1, A2, A3, A4, A5, A6 extends Action>(op1: HOperator<RS, S, TArgs, T1, T2, A1, A2>, op2: HOperator<RS, S, TArgs, T2, T3, A2, A3>, op3: HOperator<RS, S, TArgs, T3, T4, A3, A4>, op4: HOperator<RS, S, TArgs, T4, T5, A4, A5>, op5: HOperator<RS, S, TArgs, T5, T6, A5, A6>): AsyncActionCreator<TArgs, A6, T6>
+    pipe<T1, T2, T3, T4, T5, T6, T7, A1, A2, A3, A4, A5, A6, A7 extends Action>(op1: HOperator<RS, S, TArgs, T1, T2, A1, A2>, op2: HOperator<RS, S, TArgs, T2, T3, A2, A3>, op3: HOperator<RS, S, TArgs, T3, T4, A3, A4>, op4: HOperator<RS, S, TArgs, T4, T5, A4, A5>, op5: HOperator<RS, S, TArgs, T5, T6, A5, A6>, op6: HOperator<RS, S, TArgs, T6, T7, A6, A7>): AsyncActionCreator<TArgs, A7, T7>
+    pipe<T1, T2, T3, T4, T5, T6, T7, T8, A1, A2, A3, A4, A5, A6, A7, A8 extends Action>(op1: HOperator<RS, S, TArgs, T1, T2, A1, A2>, op2: HOperator<RS, S, TArgs, T2, T3, A2, A3>, op3: HOperator<RS, S, TArgs, T3, T4, A3, A4>, op4: HOperator<RS, S, TArgs, T4, T5, A4, A5>, op5: HOperator<RS, S, TArgs, T5, T6, A5, A6>, op6: HOperator<RS, S, TArgs, T6, T7, A6, A7>, op7: HOperator<RS, S, TArgs, T7, T8, A7, A8>): AsyncActionCreator<TArgs, A8, T8>
+    pipe<T1, T2, T3, T4, T5, T6, T7, T8, T9, A1, A2, A3, A4, A5, A6, A7, A8, A9 extends Action>(op1: HOperator<RS, S, TArgs, T1, T2, A1, A2>, op2: HOperator<RS, S, TArgs, T2, T3, A2, A3>, op3: HOperator<RS, S, TArgs, T3, T4, A3, A4>, op4: HOperator<RS, S, TArgs, T4, T5, A4, A5>, op5: HOperator<RS, S, TArgs, T5, T6, A5, A6>, op6: HOperator<RS, S, TArgs, T6, T7, A6, A7>, op7: HOperator<RS, S, TArgs, T7, T8, A7, A8>, op8: HOperator<RS, S, TArgs, T8, T9, A8, A9>): AsyncActionCreator<TArgs, A9, T9>
+    pipe<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10 extends Action>(op1: HOperator<RS, S, TArgs, T1, T2, A1, A2>, op2: HOperator<RS, S, TArgs, T2, T3, A2, A3>, op3: HOperator<RS, S, TArgs, T3, T4, A3, A4>, op4: HOperator<RS, S, TArgs, T4, T5, A4, A5>, op5: HOperator<RS, S, TArgs, T5, T6, A5, A6>, op6: HOperator<RS, S, TArgs, T6, T7, A6, A7>, op7: HOperator<RS, S, TArgs, T7, T8, A7, A8>, op8: HOperator<RS, S, TArgs, T8, T9, A8, A9>, op9: HOperator<RS, S, TArgs, T9, T10, A9, A10>): AsyncActionCreator<TArgs, A10, T10>
+    pipe<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, A11 extends Action>(op1: HOperator<RS, S, TArgs, T1, T2, A1, A2>, op2: HOperator<RS, S, TArgs, T2, T3, A2, A3>, op3: HOperator<RS, S, TArgs, T3, T4, A3, A4>, op4: HOperator<RS, S, TArgs, T4, T5, A4, A5>, op5: HOperator<RS, S, TArgs, T5, T6, A5, A6>, op6: HOperator<RS, S, TArgs, T6, T7, A6, A7>, op7: HOperator<RS, S, TArgs, T7, T8, A7, A8>, op8: HOperator<RS, S, TArgs, T8, T9, A8, A9>, op9: HOperator<RS, S, TArgs, T9, T10, A9, A10>, op10: HOperator<RS, S, TArgs, T10, T11, A10, A11>): AsyncActionCreator<TArgs, A11, T11>
   }
 }
 
@@ -135,10 +124,10 @@ class Handler<TStore, TRootStore> implements HandlerClass<TStore, TRootStore> {
       : Handler.prefixIterator.next().value
   }
 
-  handle(fn: PipeActionCreator<any>, ...operators: HOperator[]): void
-  handle<A>(fn: ActionCreator<A>, handler: ActionHandler<TStore, Action & { args: A }>): void
-  handle(fn: ActionCreator<any> | PipeActionCreator<any>, ...operators: any[]) {
-    if (fn[FACTORY_SYM].type === FactoryType.Pipe) {
+  handle(fn: ActionCreator<any>, ...operators: any[]) {
+    this.checkType(fn.TYPE)
+
+    if ((fn as AsyncActionCreator).ASYNC) {
       const chain = new HandlerChain<TStore>()
 
       const initEventArgs: HOperatorOnInitEvent<TStore> = {
@@ -150,15 +139,7 @@ class Handler<TStore, TRootStore> implements HandlerClass<TStore, TRootStore> {
         if (op.hooks.init)
           op.hooks.init(initEventArgs)
 
-      this.actionHandlers[fn.TYPE] = (
-        (state, action: InternalAction) => {
-          const handler = chain.asyncActionHandlers[action[META_SYM].state]
-
-          return handler
-            ? callHandlers(handler, state, action)
-            : state
-        }
-      ) as ActionHandler<TStore, Action>
+      this.setAsyncHandlers(chain, fn.TYPE)
     }
     else {
       this.actionHandlers[fn.TYPE] = operators[0]
@@ -167,17 +148,14 @@ class Handler<TStore, TRootStore> implements HandlerClass<TStore, TRootStore> {
 
   action<A = undefined>(name?: string): {
     empty(): ActionCreator<A>
-    handle(handler: ActionHandler<TStore, Action & { args: A }>): ActionCreator<A>
-    pipe<T>(...operators: HOperator<TRootStore, TStore, A, T>[]): PipeActionCreator<A>
+    handle(handler: ActionHandler<TStore, Action & { args: A }>): SyncActionCreator<A>
+    pipe<T>(...operators: HOperator<TRootStore, TStore, A, T>[]): AsyncActionCreator<A>
   } {
     const type = name != null
       ? `${this._prefix}/${name}`
       : this.nextActionType
 
-    if (process.env.NODE_ENV !== 'production') {
-      if (this.actionHandlers[type])
-        throw new TypeError(`Handler on action '${type}' registered multiple times in single reducer. Check your action name.`)
-    }
+    this.checkType(type)
 
     return {
       empty: () => this.empty(type),
@@ -194,31 +172,27 @@ class Handler<TStore, TRootStore> implements HandlerClass<TStore, TRootStore> {
   }
 
   private empty<A>(type: string) {
-    const factory = (() => ({ type })) as ActionCreator<A>
+    const factory = (() => ({ type })) as SyncActionCreator<A>
 
     factory.TYPE = type
-    factory[FACTORY_SYM] = {
-      type: FactoryType.Sync
-    }
+    factory.SYNC = true
 
     return factory
   }
 
-  private sync<A>(type: string, fn: ActionHandler<TStore, Action & { args: A }>): ActionCreator<A> {
+  private sync<A>(type: string, fn: ActionHandler<TStore, Action & { args: A }>) {
     this.actionHandlers[type] = fn as ActionHandler<TStore, Action>
 
     const factory =
-      (args => ({ type, args })) as PipeActionCreator<A, ArgsAction>
+      (args => ({ type, args })) as SyncActionCreator<A, ArgsAction>
 
     factory.TYPE = type
-    factory[FACTORY_SYM] = {
-      type: FactoryType.Sync
-    }
+    factory.SYNC = true
 
     return factory
   }
 
-  private pipe<A, T>(type: string, ...operators: HOperator<TRootStore, TStore, A, T>[]): PipeActionCreator<A, Action> {
+  private pipe<A, T>(type: string, ...operators: HOperator<TRootStore, TStore, A, T>[]) {
     const chain = new HandlerChain<TStore>()
 
     // #region On init
@@ -234,17 +208,7 @@ class Handler<TStore, TRootStore> implements HandlerClass<TStore, TRootStore> {
 
     // #endregion
 
-    this.actionHandlers[type] = (
-      (state, action: InternalAction) => {
-        const handler = chain.asyncActionHandlers[action[META_SYM].state]
-
-        const s = handler
-          ? callHandlers(handler, state, action)
-          : state
-
-        return s
-      }
-    ) as ActionHandler<TStore, Action>
+    this.setAsyncHandlers(chain, type)
 
     // #region On action creating
 
@@ -277,7 +241,7 @@ class Handler<TStore, TRootStore> implements HandlerClass<TStore, TRootStore> {
           if (res) {
             if (process.env.NODE_ENV !== 'production') {
               if (internalAction)
-                throw new TypeError('`ActionCreator` returns action multiple times. Perhaps you add a few main operators. Check your pipe.')
+                throw new TypeError('`ModifyActionHook` returns action multiple times. Perhaps you add a few main operators. Check your pipe.')
             }
 
             internalAction = res
@@ -285,21 +249,38 @@ class Handler<TStore, TRootStore> implements HandlerClass<TStore, TRootStore> {
         }
 
       if (!internalAction)
-        throw new TypeError('`InitHook` never returned an action. Perhaps you forgot to add the main operator. Check your pipe.')
+        throw new TypeError('`ModifyActionHook` never returned an action. Perhaps you forgot to add the main operator. Check your pipe.')
 
 
       internalAction![ARGS_SYM] = args
       return internalAction
-    }) as PipeActionCreator<A, InternalAction>
+    }) as AsyncActionCreator<A, InternalAction>
 
     // #endregion
 
     factory.TYPE = type
-    factory[FACTORY_SYM] = {
-      type: FactoryType.Pipe
-    }
+    factory.ASYNC = true
 
     return factory
+  }
+
+  private setAsyncHandlers(chain: HandlerChain<TStore>, type: string) {
+    this.actionHandlers[type] = (
+      (state, action: InternalAction) => {
+        const handler = chain.asyncActionHandlers[action[META_SYM].state]
+
+        return handler
+          ? callHandlers(handler, state, action)
+          : state
+      }
+    ) as ActionHandler<TStore, Action>
+  }
+
+  private checkType(type: string) {
+    if (process.env.NODE_ENV !== 'production') {
+      if (this.actionHandlers[type])
+        throw new TypeError(`Handler on action '${type}' registered multiple times in single reducer. Check your action name.`)
+    }
   }
 }
 

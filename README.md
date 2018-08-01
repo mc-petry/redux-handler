@@ -52,7 +52,7 @@ const addCustom = myHandler
   .handle((s, { args }) => ({ ...s, counter: s.value + args.amount }))
 ```
 
-### Async actions:
+### Async operators:
 
 ```ts
 /**
@@ -108,7 +108,34 @@ export const fetchData = myHandler
   )
 ```
 
-#### Example
+### Advanced
+
+#### Handle action in another handler
+
+```ts
+const h1 = handler<Handler1>()
+const h2 = handler<Handler2>()
+
+const action = h1
+  .action()
+  .handle(...)
+
+const actionAsync = h1
+  .action()
+  .pipe(...)
+
+h2.handle(
+  action,
+  (state, action) => (...)
+)
+
+h2.handle(
+  actionAsync,
+  // ...operators[]
+)
+```
+
+### Example
 
 Simple users fetch:
 

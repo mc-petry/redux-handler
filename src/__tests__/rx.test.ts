@@ -1,5 +1,5 @@
 import { store } from './store'
-import { baseRx, preventedRx, stopRx, getMilk } from './modules/rx'
+import { baseRx, preventedRx, stopRx, getMilk } from './modules/rx-a'
 import { RxAction } from '../operators/rx'
 import { timer } from 'rxjs'
 

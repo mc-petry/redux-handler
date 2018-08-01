@@ -1,19 +1,22 @@
 import { createStore, applyMiddleware } from 'redux'
 import { handlerMiddleware, combineHandlers } from '../'
-import { RxStoreA, rxHandler } from './modules/rx'
-import { RxStoreB, rxHandler2 } from './modules/rx2'
-import { SyncStore, syncHandler } from './modules/sync'
+import { RxStoreA, rxHandler } from './modules/rx-a'
+import { RxStoreB, rxHandler2 } from './modules/rx-b'
+import { SyncAStore, syncAHandler } from './modules/sync-a'
+import { SyncBStore, syncBHandler } from './modules/sync-b'
 
 export interface RootStore {
   rxA: RxStoreA
   rxB: RxStoreB
-  sync: SyncStore
+  syncA: SyncAStore
+  syncB: SyncBStore
 }
 
 const reducer = combineHandlers<RootStore>({
   rxA: rxHandler,
   rxB: rxHandler2,
-  sync: syncHandler
+  syncA: syncAHandler,
+  syncB: syncBHandler
 })
   .buildReducer()
 

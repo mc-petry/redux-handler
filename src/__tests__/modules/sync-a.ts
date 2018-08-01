@@ -1,16 +1,16 @@
 import { handler } from '../..'
 
-export interface SyncStore {
+export interface SyncAStore {
   prop?: string
   propArg?: string
 }
 
-export const syncHandler = handler<SyncStore>({})
+export const syncAHandler = handler<SyncAStore>({})
 
-export const baseSync = syncHandler
+export const baseSync = syncAHandler
   .action()
   .handle(s => ({ ...s, prop: 'green' }))
 
-export const baseSyncWithArgs = syncHandler
+export const baseSyncWithArgs = syncAHandler
   .action<{ data: string }>()
   .handle((s, a) => ({ ...s, propArg: a.args.data }))

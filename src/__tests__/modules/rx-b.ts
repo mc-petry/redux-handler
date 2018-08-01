@@ -1,6 +1,6 @@
 import { handler } from '../..'
 import { RootStore } from '../store'
-import { baseRx } from './rx'
+import { baseRx } from './rx-a'
 import { fulfilled, pending } from '../../operators'
 
 export interface RxStoreB {
