@@ -9,12 +9,12 @@ export interface RejectedAction<A = any> extends Action {
 /**
  * Occurs on async method failed
  */
-export const rejected = <RS, S, TArgs, T, A>(hr: ActionHandler<S, RejectedAction<TArgs>>):
-  HOperator<RS, S, TArgs, T, T, A, A> =>
-  ({
+export function rejected<RS, S, TArgs, T, A>(hr: ActionHandler<S, RejectedAction<TArgs>>): HOperator<RS, S, TArgs, T, T, A, A> {
+  return ({
     hooks: {
       init: ({ chain }) => {
         chain.asyncActionHandlers[Lifecycle.Rejected].push(hr)
       }
     }
   })
+}

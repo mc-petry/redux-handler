@@ -1,9 +1,9 @@
 {
   "name": "redux-handler",
-  "version": "0.10.2",
+  "version": "0.10.4",
   "description": "Simple and powerful tool for redux effects for medium and large projects",
   "main": "dist/index.js",
-  "typings": "dist/index",
+  "types": "index.d.ts",
   "dependencies": {},
   "devDependencies": {
     "@types/jest": "^23.3.0",
@@ -22,9 +22,10 @@
   },
   "scripts": {
     "test": "jest",
-    "build": "tsc -p tsconfig.json",
+    "compile": "tsc -p tsconfig.json",
     "clean": "rimraf dist",
-    "prepare": "run-s clean build",
+    "pack": "node pack.js",
+    "build": "run-s clean compile pack",
     "watch": "tsc -w"
   },
   "repository": {

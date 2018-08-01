@@ -1,7 +1,0 @@
-node_modules
-src
-.vscode
-tsconfig.base.json
-tsconfig.json
-tsconfig.test.json
-tslint.json

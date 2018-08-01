@@ -8,12 +8,12 @@ export interface PendingAction<A = any> extends Action {
 /**
  * Occurs before async method is called
  */
-export const pending = <RS, S, TArgs, T, A>(hr: ActionHandler<S, PendingAction<TArgs>>):
-  HOperator<RS, S, TArgs, T, T, A, A> =>
-  ({
+export function pending<RS, S, TArgs, T, A>(hr: ActionHandler<S, PendingAction<TArgs>>): HOperator<RS, S, TArgs, T, T, A, A> {
+  return ({
     hooks: {
       init: ({ chain }) => {
         chain.asyncActionHandlers[Lifecycle.Pending].push(hr)
       }
     }
   })
+}

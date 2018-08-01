@@ -8,12 +8,12 @@ export interface CompletedAction<A = any> extends Action {
 /**
  * Occurs after async method is completed
  */
-export const completed = <RS, S, TArgs, T, A>(hr: ActionHandler<S, CompletedAction<TArgs>>):
-  HOperator<RS, S, TArgs, T, T, A, A> =>
-  ({
+export function completed<RS, S, TArgs, T, A>(hr: ActionHandler<S, CompletedAction<TArgs>>): HOperator<RS, S, TArgs, T, T, A, A> {
+  return ({
     hooks: {
       init: ({ chain }) => {
         chain.asyncActionHandlers[Lifecycle.Completed].push(hr)
       }
     }
   })
+}

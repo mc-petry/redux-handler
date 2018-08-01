@@ -137,17 +137,19 @@ const beforeNext: BeforeNextHook<any> = ({ dispatch, action, options, getState, 
 /**
  * Handle rxjs observable
  */
-export const rx = <RS, S, A, T>(fn: RxFn<RS, S, A, T>): HOperator<RS, S, A, T, T, any, RxAction> => ({
-  hooks: {
-    modifyAction: e => {
-      const action: RxInternalAction = {
-        ...e.action,
-        rx: true,
-        [RX_SYM]: { fn }
-      }
+export function rx<RS, S, A, T>(fn: RxFn<RS, S, A, T>): HOperator<RS, S, A, T, T, any, RxAction> {
+  return ({
+    hooks: {
+      modifyAction: e => {
+        const action: RxInternalAction = {
+          ...e.action,
+          rx: true,
+          [RX_SYM]: { fn }
+        }
 
-      return action
-    },
-    beforeNext
-  }
-})
+        return action
+      },
+      beforeNext
+    }
+  })
+}

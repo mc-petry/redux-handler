@@ -9,8 +9,8 @@ export const syncAHandler = handler<SyncAStore>({})
 
 export const baseSync = syncAHandler
   .action()
-  .handle(s => ({ ...s, prop: 'green' }))
+  .sync(s => ({ ...s, prop: 'green' }))
 
 export const baseSyncWithArgs = syncAHandler
   .action<{ data: string }>()
-  .handle((s, a) => ({ ...s, propArg: a.args.data }))
+  .sync((s, a) => ({ ...s, propArg: a.args.data }))

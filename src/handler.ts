@@ -53,7 +53,7 @@ interface HandlerClass<S, RS> extends InternalHandler<S> {
     /**
      * Handle sync actions
      */
-    handle(handler: ActionHandler<S, Action & { args: TArgs }>): SyncActionCreator<TArgs>
+    sync(handler: ActionHandler<S, Action & { args: TArgs }>): SyncActionCreator<TArgs>
 
     /*
      Generate `pipe` aliases:
@@ -148,7 +148,7 @@ class Handler<TStore, TRootStore> implements HandlerClass<TStore, TRootStore> {
 
   action<A = undefined>(name?: string): {
     empty(): ActionCreator<A>
-    handle(handler: ActionHandler<TStore, Action & { args: A }>): SyncActionCreator<A>
+    sync(handler: ActionHandler<TStore, Action & { args: A }>): SyncActionCreator<A>
     pipe<T>(...operators: HOperator<TRootStore, TStore, A, T>[]): AsyncActionCreator<A>
   } {
     const type = name != null
@@ -159,7 +159,7 @@ class Handler<TStore, TRootStore> implements HandlerClass<TStore, TRootStore> {
 
     return {
       empty: () => this.empty(type),
-      handle: hr => this.sync(type, hr),
+      sync: hr => this.sync(type, hr),
       pipe: (fn, ...ops) => this.pipe(type, fn, ...ops)
     }
   }
@@ -267,10 +267,10 @@ class Handler<TStore, TRootStore> implements HandlerClass<TStore, TRootStore> {
   private setAsyncHandlers(chain: HandlerChain<TStore>, type: string) {
     this.actionHandlers[type] = (
       (state, action: InternalAction) => {
-        const handler = chain.asyncActionHandlers[action[META_SYM].state]
+        const hr = chain.asyncActionHandlers[action[META_SYM].state]
 
-        return handler
-          ? callHandlers(handler, state, action)
+        return hr
+          ? callHandlers(hr, state, action)
           : state
       }
     ) as ActionHandler<TStore, Action>
@@ -284,5 +284,5 @@ class Handler<TStore, TRootStore> implements HandlerClass<TStore, TRootStore> {
   }
 }
 
-export default <TStore, TRootStore = never>(initialState: TStore, options: HandlerOptions = {}) =>
+export const handler = <TStore, TRootStore = never>(initialState: TStore, options: HandlerOptions = {}) =>
   new Handler<TStore, TRootStore>(initialState, options) as HandlerClass<TStore, TRootStore>

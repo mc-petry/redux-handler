@@ -175,3 +175,10 @@ export const fetchUsers = usersHandler
     )
   )
 ```
+
+## Dev
+
+### Publishing
+
+`npm run build`
+`npm publish dist`
