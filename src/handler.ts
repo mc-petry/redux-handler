@@ -25,7 +25,8 @@ type ActionCreatorWithArgs<TAction, TPayload, TArgs> = ((args: TArgs) => TAction
  * We needs explicit Action Creator types to infer TArgs & TPayload
  * Also we split sync and async action creators to have full intellisence
  */
-type ActionCreator<TArgs, TAction extends Action = Action, TPayload = undefined> = TArgs extends undefined
+// Use tuple type because of https://github.com/Microsoft/TypeScript/issues/25960
+type ActionCreator<TArgs, TAction extends Action = Action, TPayload = undefined> = [TArgs] extends [undefined]
   // ? (<T = TPayload>() => TAction)
   ? ActionCreatorWithoutArgs<TAction, TPayload>
   // : (<T = TPayload, A = TArgs>(args: A) => TAction)

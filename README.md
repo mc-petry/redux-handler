@@ -135,6 +135,18 @@ h2.handle(
 )
 ```
 
+#### Redux devtools extension integration
+
+```ts
+import { actionSanitizer } from 'redux-handler/utils'
+
+const composeEnhancers: typeof compose = window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__
+  ? window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__({ actionSanitizer })
+  : compose
+
+export const store = createStore(reducer, composeEnhancers(...composes))
+```
+
 ### Example
 
 Simple users fetch:
@@ -176,7 +188,7 @@ export const fetchUsers = usersHandler
   )
 ```
 
-## Dev
+## Development
 
 ### Publishing
 

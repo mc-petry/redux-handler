@@ -1,6 +1,6 @@
 {
   "name": "redux-handler",
-  "version": "0.10.5",
+  "version": "0.10.7",
   "description": "Simple and powerful tool for redux effects for medium and large projects",
   "main": "dist/index.js",
   "types": "index.d.ts",

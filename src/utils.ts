@@ -8,7 +8,7 @@ export const actionSanitizer: (action: Action) => Action =
   action => {
     const meta = (action as InternalAction)[META_SYM]
 
-    return meta.state !== undefined
+    return meta
       ? ({ ...action, type: `${action.type} [ ${meta.state.toUpperCase()} ]` })
       : action
   }
