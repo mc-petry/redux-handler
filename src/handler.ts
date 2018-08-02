@@ -1,4 +1,4 @@
-import { Lifecycle, ActionHandler, Action, InternalAction, InternalHandler, ArgsAction, META_SYM, ARGS_SYM } from './types'
+import { Lifecycle, ActionHandler, Action, InternalAction, InternalHandler, SyncAction, META_SYM, ARGS_SYM } from './types'
 import { HOperator, HOperatorOnInitEvent, HOperatorOnActionCreatingEvent } from './api'
 import { Reducer } from 'redux'
 import { HandlerChain } from './internal/handler-chain'
@@ -184,7 +184,7 @@ class Handler<TStore, TRootStore> implements HandlerClass<TStore, TRootStore> {
     this.actionHandlers[type] = fn as ActionHandler<TStore, Action>
 
     const factory =
-      (args => ({ type, args })) as SyncActionCreator<A, ArgsAction>
+      (args => ({ type, args })) as SyncActionCreator<A, SyncAction>
 
     factory.TYPE = type
     factory.SYNC = true
