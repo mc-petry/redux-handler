@@ -41,7 +41,7 @@ const myHandler = handler<Store>({ counter: 0 })
 ```ts
 const add = myHandler
   .action() // .action('ACTION_NAME') for explicit name
-  .handle(s => ({ ...s, counter: s.value + 1 }))
+  .sync(s => ({ ...s, counter: s.value + 1 }))
 ```
 
 #### With args
@@ -49,7 +49,7 @@ const add = myHandler
 ```ts
 const addCustom = myHandler
   .action<{ amount: number }>()
-  .handle((s, { args }) => ({ ...s, counter: s.value + args.amount }))
+  .sync((s, { args }) => ({ ...s, counter: s.value + args.amount }))
 ```
 
 ### Async operators:
@@ -118,7 +118,7 @@ const h2 = handler<Handler2>()
 
 const action = h1
   .action()
-  .handle(...)
+  .sync(...)
 
 const actionAsync = h1
   .action()
@@ -162,7 +162,7 @@ Dispatch another action inside action:
 ```ts
 export const updateUsersBalance = usersHandler
   .action()
-  .handle(s => ({ ...s, balance: s.users.reduce((a, b) => a + b.balance, 0) }))
+  .sync(s => ({ ...s, balance: s.users.reduce((a, b) => a + b.balance, 0) }))
 
 export const fetchUsers = usersHandler
   .action()

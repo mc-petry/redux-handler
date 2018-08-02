@@ -6,8 +6,8 @@ export const META_SYM = Symbol('meta')
 
 export interface Action extends ReduxAction<string> { }
 
-export interface ArgsAction extends Action {
-  args: any
+export interface SyncAction<T = any> extends Action {
+  args: T
 }
 
 interface AsyncActionMeta {
