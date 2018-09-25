@@ -1,7 +1,5 @@
-interface NodeProcess {
+declare const process: {
   env: {
-    NODE_ENV: "production"
+    NODE_ENV: 'production'
   }
 }
-
-declare var process: NodeProcess

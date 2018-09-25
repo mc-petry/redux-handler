@@ -2,12 +2,35 @@
 
 Powerful and simple redux middleware via RxJS. Forget about the difficulty with redux. Designed for large projects. Use it with TypeScript for full intellisense.
 
-peerDependencies: redux v4, rxjs v6
+# Table of Contents
 
-## Installation
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Sync actions](#sync-actions)
+  - [Operators](#operators)
+    - [rx](#rx)
+    - [available](#available)
+    - [pending](#pending)
+    - [fulfilled](#fulfilled)
+    - [rejected](#rejected)
+    - [completed](#completed)
+    - [loading](#loading)
+  - [Advanced](#advanced)
+    - [Handle action in another handler](#handle-action-in-another-handler)
+    - [Redux devtools](#redux-devtools)
+  - [Example](#example)
+
+# Requirements
+
+peer dependencies:
+ - redux: ^4
+ - rxjs: ^6
+
+# Installation
 
 ```ts
-// Definer your inner stores
+// Define your inner stores
 interface RootStore {
   inner: InnerStore
 }
@@ -24,7 +47,7 @@ const reducer = combineHandlers<RootStore>({
 const store = createStore(reducer, applyMiddleware(handlerMiddleware()))
 ```
 
-## Usage
+# Usage
 
 Define store & handler:
 
@@ -36,7 +59,7 @@ interface Store {
 const myHandler = handler<Store>({ counter: 0 })
 ```
 
-### Sync actions
+## Sync actions
 
 ```ts
 const add = myHandler
@@ -44,7 +67,7 @@ const add = myHandler
   .sync(s => ({ ...s, counter: s.value + 1 }))
 ```
 
-#### With args
+### With args
 
 ```ts
 const addCustom = myHandler
@@ -52,14 +75,28 @@ const addCustom = myHandler
   .sync((s, { args }) => ({ ...s, counter: s.value + args.amount }))
 ```
 
-### Async operators:
+## Operators
+
+<a id="rx"></a>
+
+```ts
+/**
+ * Handle rxjs observable
+ */
+rx(fn: args: A, injects: { getState: () => RootStore, action$: Observable<Action>, type: string })
+```
+
+<a id="available"></a>
 
 ```ts
 /**
  * Prevents call async operators based on state
+ * You must use it before your main operator such `rx` or `promise`
  */
 available(fn: (getState: () => RootStore, other: { args: TArgs, type: string })
 ```
+
+<a id="pending"></a>
 
 ```ts
 /**
@@ -68,12 +105,16 @@ available(fn: (getState: () => RootStore, other: { args: TArgs, type: string })
 pending(hr: (state: Readonly<Store>, action: { args: TArgs, type: string }))
 ```
 
+<a id="fulfilled"></a>
+
 ```ts
 /**
  * Occurs on async method succeeds
  */
 fulfilled(hr: (state: Readonly<Store>, action: { payload: TPayload, args: TArgs, type: string }))
 ```
+
+<a id="rejected"></a>
 
 ```ts
 /**
@@ -82,12 +123,16 @@ fulfilled(hr: (state: Readonly<Store>, action: { payload: TPayload, args: TArgs,
 rejected(hr: (state: Readonly<Store>, action: { error: any, args: TArgs, type: string }))
 ```
 
+<a id="completed"></a>
+
 ```ts
 /**
  * Occurs after async method is completed
  */
 completed(hr: (state: Readonly<Store>, action: { args: TArgs, type: string }))
 ```
+
+<a id="loading"></a>
 
 ```ts
 /**
@@ -97,20 +142,21 @@ completed(hr: (state: Readonly<Store>, action: { args: TArgs, type: string }))
 loading(prop: keyof S)
 ```
 
-### RxJS
+## RxJS
 
 ```ts
 export const fetchData = myHandler
   .action()
   .pipe(
-    rx(args => ajax()),
-    // ... Your operators
+    // Optional available operator
+    rx(args => ajax(...)),
+    // Effect operators
   )
 ```
 
-### Advanced
+## Advanced
 
-#### Handle action in another handler
+### Handle action in another handler
 
 ```ts
 const h1 = handler<Handler1>()
@@ -135,7 +181,7 @@ h2.handle(
 )
 ```
 
-#### Redux devtools extension integration
+### Redux devtools
 
 ```ts
 import { actionSanitizer } from 'redux-handler/utils'
@@ -147,7 +193,7 @@ const composeEnhancers: typeof compose = window.__REDUX_DEVTOOLS_EXTENSION_COMPO
 export const store = createStore(reducer, composeEnhancers(...composes))
 ```
 
-### Example
+## Example
 
 Simple users fetch:
 
@@ -163,7 +209,7 @@ export const fetchUsers = usersHandler
   .action<{ limit: number }>()
   .pipe(
     available((getState, { args }) => getState().users.data),
-    rx(({ limit }) => ajax({ url: `/users?limit${limit}` })),
+    rx(({ limit }) => ajax({ url: `/users?limit=${limit}` })),
     fulfilled((s, { payload }) => ({ ...s, data: payload })),
     loading('loading')
   )
@@ -188,9 +234,9 @@ export const fetchUsers = usersHandler
   )
 ```
 
-## Development
+# Development
 
-### Publishing
+## Publishing
 
 `npm run build`
 `npm publish dist`
