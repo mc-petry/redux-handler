@@ -13,7 +13,7 @@ const callHandlers = <TState>(handlers: ActionHandler<TState, Action>[], state: 
 
 interface Factory {
   /**
-   * Action type
+   * Gets the action type
    */
   TYPE: string
 }
@@ -37,22 +37,22 @@ type AsyncActionCreator<TArgs = undefined, TAction extends Action = Action, TPay
 
 interface HandlerClass<S, RS> extends InternalHandler<S> {
   /**
-   * Handle existing action creator
+   * Handles an existing action creator.
    */
   handle<A, TA extends Action>(a: SyncActionCreator<A, TA>, handler: ActionHandler<S, Action & { args: A }>): void
   handle<T, A, TA extends Action>(a: AsyncActionCreator<A, TA, T>, ...ops: HOperator<RS, S, A, T, T>[]): void
 
   /**
-   * Creates new action creator
+   * Creates a new action creator.
    */
   action<TArgs = undefined>(name?: string): {
     /**
-     * Creates action without any handlers
+     * Creates an action without any handlers.
      */
     empty(): ActionCreator<TArgs>
 
     /**
-     * Handle sync actions
+     * Handles the sync action.
      */
     sync(handler: ActionHandler<S, Action & { args: TArgs }>): SyncActionCreator<TArgs>
 
@@ -80,7 +80,7 @@ interface HandlerClass<S, RS> extends InternalHandler<S> {
     */
 
     /**
-     * Handle async actions
+     * Handles the async action.
      */
     pipe<T1, T2, A1, A2 extends Action>(op1: HOperator<RS, S, TArgs, T1, T2, A1, A2>): AsyncActionCreator<TArgs, A2, T2>
     pipe<T1, T2, T3, A1, A2, A3 extends Action>(op1: HOperator<RS, S, TArgs, T1, T2, A1, A2>, op2: HOperator<RS, S, TArgs, T2, T3, A2, A3>): AsyncActionCreator<TArgs, A3, T3>

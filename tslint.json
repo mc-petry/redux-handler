@@ -8,6 +8,7 @@
     ],
     "forin": false,
     "arrow-parens": false,
+    "callable-types": false,
     "curly": false,
     "member-access": [
       false

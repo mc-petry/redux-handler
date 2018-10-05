@@ -5,14 +5,14 @@ import { HandlerPlugin, PluginOnNextHookEvent } from './plugin-api'
 
 export interface ErrorHandlerInjects {
   /**
-   * Action type
+   * Gets the action type.
    */
   type: string
 }
 
 export interface MiddlewareOptions {
   /**
-   * You can return a new action to dispatch in store
+   * Allows to return a new action to dispatch in store.
    */
   errorHandler?: (error: any, injects: ErrorHandlerInjects) => Action | void
   plugins: HandlerPlugin[]

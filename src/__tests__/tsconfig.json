@@ -1,9 +1,10 @@
 {
-  "extends": "./tsconfig.base",
+  "extends": "../../tsconfig.base",
   "compilerOptions": {
     "module": "commonjs"
   },
   "include": [
-    "src/__tests__"
+    "**/*",
+    "../typings.d.ts"
   ]
 }

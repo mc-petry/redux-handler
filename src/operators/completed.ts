@@ -6,7 +6,7 @@ export interface CompletedAction<A = any> extends Action {
 }
 
 /**
- * Occurs after async method is completed
+ * Occurs after async method is completed.
  */
 export function completed<RS, S, TArgs, T, A>(hr: ActionHandler<S, CompletedAction<TArgs>>): HOperator<RS, S, TArgs, T, T, A, A> {
   return ({

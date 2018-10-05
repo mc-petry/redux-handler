@@ -1,4 +1,4 @@
-import { InternalAction, META_SYM, Lifecycle } from '../types'
+import { InternalAction, META_SYM, Lifecycle, Action } from '../types'
 
 /**
  * Creates a copy of internal action with
@@ -14,3 +14,6 @@ export const mutateInternalAction: <T>(source: InternalAction, state: Lifecycle,
         state
       }
     })
+
+export const payloadIsAction = (actionOrPayload: any) =>
+  actionOrPayload && typeof (actionOrPayload as Action).type === 'string'

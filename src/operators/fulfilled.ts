@@ -7,7 +7,7 @@ export interface FulfilledAction<A = any, T = any> extends Action {
 }
 
 /**
- * Occurs on async method succeeds
+ * Occurs on async method succeeds.
  */
 export function fulfilled<RS, S, TArgs, T, A>(hr: ActionHandler<S, FulfilledAction<TArgs, T>>): HOperator<RS, S, TArgs, T, T, A, A> {
   return ({

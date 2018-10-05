@@ -1,6 +1,8 @@
 # redux-handler
 
-Powerful and simple redux middleware via RxJS. Forget about the difficulty with redux. Designed for large projects. Use it with TypeScript for full intellisense.
+Powerful and simple redux middleware. Forget about the difficulty with redux. Designed for large projects.
+
+Out of the box handles **RxJS Observable** and **Promise**.
 
 # Table of Contents
 
@@ -10,6 +12,7 @@ Powerful and simple redux middleware via RxJS. Forget about the difficulty with 
   - [Sync actions](#sync-actions)
   - [Operators](#operators)
     - [rx](#rx)
+    - [promise](#promise)
     - [available](#available)
     - [pending](#pending)
     - [fulfilled](#fulfilled)
@@ -25,6 +28,8 @@ Powerful and simple redux middleware via RxJS. Forget about the difficulty with 
 
 peer dependencies:
  - redux: ^4
+
+optional dependencies:
  - rxjs: ^6
 
 # Installation
@@ -81,17 +86,26 @@ const addCustom = myHandler
 
 ```ts
 /**
- * Handle rxjs observable
+ * Handles rxjs observable.
  */
-rx(fn: args: A, injects: { getState: () => RootStore, action$: Observable<Action>, type: string })
+rx(fn: (args: A, injects: { getState: () => RootStore, action$: Observable<Action>, type: string }) => Observable)
+```
+
+<a id="promise"></a>
+
+```ts
+/**
+ * Handles the promise.
+ */
+promise(fn: (args: A, injects: { getState: () => RootStore, type: string }) => PromiseLike<T>) {
 ```
 
 <a id="available"></a>
 
 ```ts
 /**
- * Prevents call async operators based on state
- * You must use it before your main operator such `rx` or `promise`
+ * Prevents calling async operators based on state.
+ * Can be used only before main operator such `rx` or `promise`.
  */
 available(fn: (getState: () => RootStore, other: { args: TArgs, type: string })
 ```
@@ -100,7 +114,7 @@ available(fn: (getState: () => RootStore, other: { args: TArgs, type: string })
 
 ```ts
 /**
- * Occurs before async method is called
+ * Occurs before async method is called.
  */
 pending(hr: (state: Readonly<Store>, action: { args: TArgs, type: string }))
 ```
@@ -109,7 +123,7 @@ pending(hr: (state: Readonly<Store>, action: { args: TArgs, type: string }))
 
 ```ts
 /**
- * Occurs on async method succeeds
+ * Occurs on async method succeeds.
  */
 fulfilled(hr: (state: Readonly<Store>, action: { payload: TPayload, args: TArgs, type: string }))
 ```
@@ -118,7 +132,7 @@ fulfilled(hr: (state: Readonly<Store>, action: { payload: TPayload, args: TArgs,
 
 ```ts
 /**
- * Occurs on async method failed
+ * Occurs on async method failed.
  */
 rejected(hr: (state: Readonly<Store>, action: { error: any, args: TArgs, type: string }))
 ```
@@ -127,7 +141,7 @@ rejected(hr: (state: Readonly<Store>, action: { error: any, args: TArgs, type: s
 
 ```ts
 /**
- * Occurs after async method is completed
+ * Occurs after async method is completed.
  */
 completed(hr: (state: Readonly<Store>, action: { args: TArgs, type: string }))
 ```
@@ -136,8 +150,8 @@ completed(hr: (state: Readonly<Store>, action: { args: TArgs, type: string }))
 
 ```ts
 /**
- * On 'pending' sets property to `true`
- * On 'completed' sets property to `false`
+ * Sets the property = `true` on pending.
+ * Sets the property = `false` on completed.
  */
 loading(prop: keyof S)
 ```
@@ -148,9 +162,9 @@ loading(prop: keyof S)
 export const fetchData = myHandler
   .action()
   .pipe(
-    // Optional available operator
+    // Optional `available` operator
     rx(args => ajax(...)),
-    // Effect operators
+    // Effects operators
   )
 ```
 
@@ -238,5 +252,5 @@ export const fetchUsers = usersHandler
 
 ## Publishing
 
-`npm run build`
+`npm run build`\
 `npm publish dist`

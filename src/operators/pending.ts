@@ -6,7 +6,7 @@ export interface PendingAction<A = any> extends Action {
 }
 
 /**
- * Occurs before async method is called
+ * Occurs before async method is called.
  */
 export function pending<RS, S, TArgs, T, A>(hr: ActionHandler<S, PendingAction<TArgs>>): HOperator<RS, S, TArgs, T, T, A, A> {
   return ({

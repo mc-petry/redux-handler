@@ -1,7 +1,7 @@
 import { Lifecycle, Action, META_SYM, InternalAction, ARGS_SYM } from '../types'
 import { errorHandler } from '../internal/error-handler'
 import { HOperator, BeforeNextHook } from '../api'
-import { mutateInternalAction } from '../internal/utils'
+import { mutateInternalAction, payloadIsAction } from '../internal/utils'
 import { PendingAction } from './pending'
 import { FulfilledAction } from './fulfilled'
 import { RejectedAction } from './rejected'
@@ -9,19 +9,18 @@ import { CompletedAction } from './completed'
 
 declare module 'redux' {
   interface Dispatch<A extends Action = AnyAction> {
-    // tslint:disable-next-line:callable-types
     <T>(action: PromiseAction<T>): PromiseLike<T>
   }
 }
 
 interface PromiseInjects<TRootStore> {
   /**
-   * Gets global redux state
+   * Gets global redux state.
    */
   getState: () => TRootStore
 
   /**
-   * Action name
+   * Gets the action type.
    */
   type: string
 }
@@ -29,19 +28,28 @@ interface PromiseInjects<TRootStore> {
 type PromiseFn<RS = any, S = any, A = any, T = any> = (args: A, injects: PromiseInjects<RS>) => PromiseLike<T>
 
 /**
- * Needs to have explicit rx interface to
- * support intellisense inside redux dispatch
+ * Needs to have explicit promise interface to
+ * support intellisense inside redux dispatch.
  */
 export interface PromiseAction<T> extends Action {
   promise: true
 }
 
-const PROMISE_SYM = Symbol('rx')
+const PROMISE_SYM = Symbol('promise')
+const PROMISE_PUT = Symbol('put')
+
+interface PromisePut {
+  [PROMISE_PUT]: (Action | any)[]
+}
 
 interface PromiseInternalAction extends InternalAction, PromiseAction<any> {
   [PROMISE_SYM]: {
     fn: PromiseFn
   }
+}
+
+function isPromisePut(payload: any): payload is PromisePut {
+  return payload && (payload as PromisePut)[PROMISE_PUT] != null
 }
 
 const beforeNext: BeforeNextHook<any> = ({ dispatch, action, options, getState, defaultPrevented }) => {
@@ -64,14 +72,32 @@ const beforeNext: BeforeNextHook<any> = ({ dispatch, action, options, getState, 
 
   return promiseMeta.fn(args, { getState, type: action.type })
     .then(
-      payload => {
-        if (meta.async.fulfilled)
-          dispatch(mutateInternalAction<FulfilledAction>(action, Lifecycle.Fulfilled, { args, payload }))
+      output => {
+        const payloads = []
+
+        if (isPromisePut(output)) {
+          for (const actionOrPayload of output[PROMISE_PUT]) {
+            if (payloadIsAction(actionOrPayload)) {
+              dispatch(actionOrPayload)
+            }
+            else {
+              payloads.push(actionOrPayload)
+            }
+          }
+        }
+        else {
+          payloads.push(output)
+        }
+
+        for (const payload of payloads) {
+          if (meta.async.fulfilled)
+            dispatch(mutateInternalAction<FulfilledAction>(action, Lifecycle.Fulfilled, { args, payload }))
+        }
 
         if (meta.async.completed)
           dispatch(mutateInternalAction<CompletedAction>(action, Lifecycle.Completed, { args }))
 
-        return payload
+        return payloads
       },
       error => {
         if (meta.async.rejected)
@@ -86,7 +112,7 @@ const beforeNext: BeforeNextHook<any> = ({ dispatch, action, options, getState, 
 }
 
 /**
- * Handle rxjs observable
+ * Handles the promise.
  */
 export function promise<RS, S, A, T>(fn: PromiseFn<RS, S, A, T>): HOperator<RS, S, A, T, T, any, PromiseAction<T>> {
   return ({
@@ -103,4 +129,16 @@ export function promise<RS, S, A, T>(fn: PromiseFn<RS, S, A, T>): HOperator<RS, 
       beforeNext
     }
   })
+}
+
+/**
+ * Allows to dispatch actions after promise resolved.
+ * Other data will be passed.
+ */
+promise.put = <T>(data: T[]): Exclude<T, Action> => {
+  const obj: PromisePut = {
+    [PROMISE_PUT]: data
+  }
+
+  return obj as any
 }

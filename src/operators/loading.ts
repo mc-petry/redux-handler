@@ -1,9 +1,9 @@
-import { Lifecycle, } from '../types'
+import { Lifecycle } from '../types'
 import { HOperator } from '../api'
 
 /**
- * On 'pending' sets property to `true`
- * On 'completed' sets property to `false`
+ * Sets the property = `true` on pending.
+ * Sets the property = `false` on completed.
  */
 export function loading<S extends {}, TArgs, T, RS, A>(prop: keyof S): HOperator<RS, S, TArgs, T, T, A, A> {
   return ({

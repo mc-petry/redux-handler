@@ -15,7 +15,7 @@ interface AsyncActionMeta {
   state: Lifecycle
 
   /**
-   * Prevents unnecessary dispatch calls
+   * Prevents unnecessary dispatch calls.
    */
   async: {
     pending: boolean

@@ -33,7 +33,7 @@ export interface HOperatorOnBeforeNextEvent<TRootStore, TAction extends Internal
 
 export interface HOperatorOnAfterNextEvent<TRootStore, TAction extends InternalAction = InternalAction> extends HOperatorOnMiddlewareBaseEvent<TRootStore> {
   /**
-   * You can replace returns `action` in middleware
+   * Allows to override returning `action` in middleware.
    */
   readonly action: TAction
 }
@@ -46,24 +46,24 @@ export interface HOperator<TRootStore = any, TStore = any, TArgs = any, TPayload
   hooks: {
     /**
      * Occurs on action creating.
-     * Here you must register your handlers
+     * Here you must register your handlers.
      */
     init?: InitHook<TStore>
 
     /**
-     * Only single operator in pipeline must modify
+     * Only single operator in pipeline must modify.
      */
     modifyAction?: ModifyActionHook<TStore>
 
     /**
-     * Occurs before next action will be dispatched
-     * @returns Return value to prevent next hook logic
+     * Occurs before next action will be dispatched.
+     * @returns Return value to prevent next hook logic.
      */
     beforeNext?: BeforeNextHook<TRootStore>
 
     /**
-     * Occurs after `next(action)` passed
-     * @returns New action if needed
+     * Occurs after `next(action)` passed.
+     * @returns New action if needed.
      */
     afterNext?: AfterNextHook<TRootStore>
   }

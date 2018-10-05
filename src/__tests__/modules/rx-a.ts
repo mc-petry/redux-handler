@@ -70,11 +70,11 @@ export const preventedRx = rxHandler
 
 export const produceYoghurt = rxHandler
   .action()
-  .sync(s => ({ ...s, yoghurt: s.milk / 2 }))
+  .sync(s => ({ ...s, yoghurt: s.milk! / 2 }))
 
 export const produceCheese = rxHandler
   .action()
-  .sync(s => ({ ...s, cheese: s.milk / 5 }))
+  .sync(s => ({ ...s, cheese: s.milk! / 5 }))
 
 export const getMilk = rxHandler
   .action()

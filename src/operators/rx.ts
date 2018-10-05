@@ -2,8 +2,8 @@ import { Lifecycle, Action, META_SYM, InternalAction, ARGS_SYM } from '../types'
 import { mergeMap, finalize } from 'rxjs/operators'
 import { errorHandler } from '../internal/error-handler'
 import { HOperator, BeforeNextHook } from '../api'
-import { Subject, Subscription, Observable, EMPTY } from 'rxjs'
-import { mutateInternalAction } from '../internal/utils'
+import { Subject, Observable } from 'rxjs'
+import { mutateInternalAction, payloadIsAction } from '../internal/utils'
 import { PendingAction } from './pending'
 import { FulfilledAction } from './fulfilled'
 import { RejectedAction } from './rejected'
@@ -12,24 +12,23 @@ import { HandlerPlugin, PluginOnNextHookEvent } from '../plugin-api'
 
 declare module 'redux' {
   interface Dispatch<A extends Action = AnyAction> {
-    // tslint:disable-next-line:callable-types
-    (action: RxAction): Subscription
+    (action: RxAction): Promise<any>
   }
 }
 
 interface RxInjects<TRootStore> {
   /**
-   * Gets global redux state
+   * Gets the global redux state.
    */
   getState: () => TRootStore
 
   /**
-   * Root stream
+   * Gets the root stream.
    */
   action$: Observable<Action>
 
   /**
-   * Action name
+   * Gets the action type.
    */
   type: string
 }
@@ -38,7 +37,7 @@ type RxFn<RS = any, S = any, A = any, T = any> = (args: A, injects: RxInjects<RS
 
 /**
  * Needs to have explicit rx interface to
- * support intellisense inside redux dispatch
+ * support intellisense inside redux dispatch.
  */
 export interface RxAction extends Action {
   rx: true
@@ -55,7 +54,7 @@ interface RxInternalAction extends InternalAction, RxAction {
 class RxPlugin implements HandlerPlugin {
   /**
    * Root stream. All actions passed though it.
-   * Applies after first usage of rx operator
+   * Applies after first usage of rx operator.
    */
   readonly action$ = new Subject<Action>()
 
@@ -63,6 +62,9 @@ class RxPlugin implements HandlerPlugin {
     this.action$.next(e.action)
   }
 }
+
+// tslint:disable-next-line:no-empty
+const EMPTY_FN = () => { }
 
 const beforeNext: BeforeNextHook<any> = ({ dispatch, action, options, getState, defaultPrevented }) => {
   const meta = action[META_SYM]
@@ -75,7 +77,7 @@ const beforeNext: BeforeNextHook<any> = ({ dispatch, action, options, getState, 
     return
 
   if (defaultPrevented)
-    return EMPTY.subscribe()
+    return Promise.resolve()
 
   const args = action[ARGS_SYM]
 
@@ -94,19 +96,19 @@ const beforeNext: BeforeNextHook<any> = ({ dispatch, action, options, getState, 
 
   // #endregion
 
-  const subscription = rxmeta.fn(args, { getState, action$: plugin.action$, type: action.type })
+  const obs = rxmeta.fn(args, { getState, action$: plugin.action$, type: action.type })
     .pipe(
-      mergeMap((output: Action) => {
-        if (output === undefined)
-          throw new TypeError(`Action ${action.type} does not return a stream`)
+      mergeMap((actionOrPayload: Action) => {
+        if (actionOrPayload === undefined)
+          throw new TypeError(`Action ${action.type} does not return a stream.`)
 
         const payloads: any[] = []
 
-        if (output && typeof output.type === 'string') {
-          dispatch(output)
+        if (payloadIsAction(actionOrPayload)) {
+          dispatch(actionOrPayload)
         }
         else {
-          payloads.push(output)
+          payloads.push(actionOrPayload)
         }
 
         return payloads
@@ -117,25 +119,27 @@ const beforeNext: BeforeNextHook<any> = ({ dispatch, action, options, getState, 
           dispatch(mutateInternalAction<CompletedAction>(action, Lifecycle.Completed, { args }))
       })
     )
-    .subscribe(
-      payload => {
-        if (meta.async.fulfilled)
-          dispatch(mutateInternalAction<FulfilledAction>(action, Lifecycle.Fulfilled, { payload, args }))
-      },
 
-      error => {
-        if (meta.async.rejected)
-          dispatch(mutateInternalAction<RejectedAction>(action, Lifecycle.Rejected, { error, args }))
+  obs.subscribe(
+    payload => {
+      if (meta.async.fulfilled)
+        dispatch(mutateInternalAction<FulfilledAction>(action, Lifecycle.Fulfilled, { payload, args }))
+    },
 
-        errorHandler({ action, dispatch, error, options })
-      }
-    )
+    error => {
+      if (meta.async.rejected)
+        dispatch(mutateInternalAction<RejectedAction>(action, Lifecycle.Rejected, { error, args }))
 
-  return subscription
+      errorHandler({ action, dispatch, error, options })
+    }
+  )
+
+  return obs.toPromise()
+    .catch(EMPTY_FN)
 }
 
 /**
- * Handle rxjs observable
+ * Handles rxjs observable.
  */
 export function rx<RS, S, A, T>(fn: RxFn<RS, S, A, T>): HOperator<RS, S, A, T, T, any, RxAction> {
   return ({

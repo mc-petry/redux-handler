@@ -7,7 +7,7 @@ export interface RejectedAction<A = any> extends Action {
 }
 
 /**
- * Occurs on async method failed
+ * Occurs on async method failed.
  */
 export function rejected<RS, S, TArgs, T, A>(hr: ActionHandler<S, RejectedAction<TArgs>>): HOperator<RS, S, TArgs, T, T, A, A> {
   return ({
