@@ -1,10 +1,10 @@
 # redux-handler
 
-Powerful and simple redux middleware. Forget about the difficulty with redux. Designed for large projects.
+Powerful and simple redux middleware to handle RxJS Observables. Forget about the difficulty with redux. Designed for large projects.
 
 Out of the box handles **RxJS Observable** and **Promise**.
 
-# Table of Contents
+## Table of Contents
 
 - [Requirements](#requirements)
 - [Installation](#installation)
@@ -24,7 +24,7 @@ Out of the box handles **RxJS Observable** and **Promise**.
     - [Redux devtools](#redux-devtools)
   - [Example](#example)
 
-# Requirements
+## Requirements
 
 peer dependencies:
  - redux: ^4
@@ -32,7 +32,7 @@ peer dependencies:
 optional dependencies:
  - rxjs: ^6
 
-# Installation
+## Installation
 
 ```ts
 // Define your inner stores
@@ -52,7 +52,7 @@ const reducer = combineHandlers<RootStore>({
 const store = createStore(reducer, applyMiddleware(handlerMiddleware()))
 ```
 
-# Usage
+## Usage
 
 Define store & handler:
 
@@ -64,7 +64,7 @@ interface Store {
 const myHandler = handler<Store>({ counter: 0 })
 ```
 
-## Sync actions
+### Sync actions
 
 ```ts
 const add = myHandler
@@ -72,7 +72,7 @@ const add = myHandler
   .sync(s => ({ ...s, counter: s.value + 1 }))
 ```
 
-### With args
+#### With args
 
 ```ts
 const addCustom = myHandler
@@ -80,7 +80,7 @@ const addCustom = myHandler
   .sync((s, { args }) => ({ ...s, counter: s.value + args.amount }))
 ```
 
-## Operators
+### Operators
 
 <a id="rx"></a>
 
@@ -156,7 +156,7 @@ completed(hr: (state: Readonly<Store>, action: { args: TArgs, type: string }))
 loading(prop: keyof S)
 ```
 
-## RxJS
+### RxJS
 
 ```ts
 export const fetchData = myHandler
@@ -168,9 +168,9 @@ export const fetchData = myHandler
   )
 ```
 
-## Advanced
+### Advanced
 
-### Handle action in another handler
+#### Handle action in another handler
 
 ```ts
 const h1 = handler<Handler1>()
@@ -195,7 +195,7 @@ h2.handle(
 )
 ```
 
-### Redux devtools
+#### Redux devtools
 
 ```ts
 import { actionSanitizer } from 'redux-handler/utils'
@@ -207,7 +207,7 @@ const composeEnhancers: typeof compose = window.__REDUX_DEVTOOLS_EXTENSION_COMPO
 export const store = createStore(reducer, composeEnhancers(...composes))
 ```
 
-## Example
+### Example
 
 Simple users fetch:
 
@@ -248,9 +248,9 @@ export const fetchUsers = usersHandler
   )
 ```
 
-# Development
+## Development
 
-## Publishing
+### Publishing
 
 `npm run build`\
 `npm publish dist`
