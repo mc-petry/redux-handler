@@ -17,10 +17,13 @@ export interface RxStoreA {
   milk?: number
   yoghurt?: number
   cheese?: number
+
+  numberOfExecutionsRx: number
 }
 
 const initialState: RxStoreA = {
-  notavailable: 'yes'
+  notavailable: 'yes',
+  numberOfExecutionsRx: 0
 }
 
 export const rxHandler = handler<RxStoreA, RootStore>(initialState)
@@ -64,6 +67,8 @@ export const preventedRx = rxHandler
     fulfilled((s, a) => ({ ...s, prevent: a.payload.xt }))
   )
 
+
+
 // ---------------------------------
 // --- dispatch action in action ---
 // ---------------------------------
@@ -87,4 +92,16 @@ export const getMilk = rxHandler
       )
     ),
     fulfilled((s, { payload }) => ({ ...s, milk: payload.liters }))
+  )
+
+export const incNumberOfExecutionsRx = rxHandler
+  .action()
+  .sync(s => ({ ...s, numberOfExecutionsRx: s.numberOfExecutionsRx + 1 }))
+
+export const executeRx = rxHandler
+  .action()
+  .pipe(
+    rx(
+      () => of(incNumberOfExecutionsRx())
+    )
   )

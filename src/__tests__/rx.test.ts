@@ -1,5 +1,5 @@
 import { store } from './store'
-import { baseRx, preventedRx, stopRx, getMilk } from './modules/rx-a'
+import { baseRx, preventedRx, stopRx, getMilk, executeRx } from './modules/rx-a'
 import { timer } from 'rxjs'
 
 const getStateA = () => store.getState().rxA
@@ -60,6 +60,14 @@ describe('rx', () => {
       expect(state.milk).toBe(10)
       expect(state.yoghurt).toBe(5)
       expect(state.cheese).toBe(2)
+    })
+
+    it('execute rx', async () => {
+      await store.dispatch(executeRx())
+
+      const state = getStateA()
+
+      expect(state.numberOfExecutionsRx).toBe(1)
     })
 
     /*
