@@ -1,8 +1,8 @@
 import { Lifecycle, Action, META_SYM, InternalAction, ARGS_SYM } from '../types'
-import { mergeMap, finalize } from 'rxjs/operators'
+import { mergeMap, finalize, tap, catchError } from 'rxjs/operators'
 import { errorHandler } from '../internal/error-handler'
 import { HOperator, BeforeNextHook } from '../api'
-import { Subject, Observable } from 'rxjs'
+import { Subject, Observable, of } from 'rxjs'
 import { mutateInternalAction, payloadIsAction } from '../internal/utils'
 import { PendingAction } from './pending'
 import { FulfilledAction } from './fulfilled'
@@ -114,25 +114,25 @@ const beforeNext: BeforeNextHook<any> = ({ dispatch, action, options, getState, 
         return payloads
       }),
 
+      tap(payload => {
+        if (meta.async.fulfilled)
+          dispatch(mutateInternalAction<FulfilledAction>(action, Lifecycle.Fulfilled, { payload, args }))
+      }),
+
+      catchError(error => {
+        if (meta.async.rejected)
+          dispatch(mutateInternalAction<RejectedAction>(action, Lifecycle.Rejected, { error, args }))
+
+        errorHandler({ action, dispatch, error, options })
+
+        return of()
+      }),
+
       finalize(() => {
         if (meta.async.completed)
           dispatch(mutateInternalAction<CompletedAction>(action, Lifecycle.Completed, { args }))
       })
     )
-
-  obs.subscribe(
-    payload => {
-      if (meta.async.fulfilled)
-        dispatch(mutateInternalAction<FulfilledAction>(action, Lifecycle.Fulfilled, { payload, args }))
-    },
-
-    error => {
-      if (meta.async.rejected)
-        dispatch(mutateInternalAction<RejectedAction>(action, Lifecycle.Rejected, { error, args }))
-
-      errorHandler({ action, dispatch, error, options })
-    }
-  )
 
   return obs.toPromise()
     .catch(EMPTY_FN)
