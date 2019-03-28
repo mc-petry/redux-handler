@@ -1,5 +1,5 @@
-import { handler } from '../..'
-import { promise, fulfilled } from '../../operators'
+import { promise, fulfilled, sync } from '../../operators'
+import { handler } from '../handler'
 
 export interface PromiseStore {
   user?: string
@@ -20,11 +20,11 @@ export const setName = promiseHandler
 
 const setDeposit = promiseHandler
   .action<{ deposit: number }>()
-  .sync((s, { args: { deposit } }) => ({ ...s, deposit }))
+  .pipe(sync((s, { args: { deposit } }) => ({ ...s, deposit })))
 
 const updateBalance = promiseHandler
   .action<{ deposit: number }>()
-  .sync((s, { args: { deposit } }) => ({ ...s, balance: s.balance + deposit }))
+  .pipe(sync((s, { args: { deposit } }) => ({ ...s, balance: s.balance + deposit })))
 
 export const getDeposit = promiseHandler
   .action<{ amount: number }>()

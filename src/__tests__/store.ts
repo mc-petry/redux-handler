@@ -5,6 +5,7 @@ import { RxStoreB, rxHandler2 } from './modules/rx-b'
 import { SyncAStore, syncAHandler } from './modules/sync-a'
 import { SyncBStore, syncBHandler } from './modules/sync-b'
 import { PromiseStore, promiseHandler } from './modules/promise'
+import { ThunkStore, thunkHandler } from './modules/thunk'
 
 export interface RootStore {
   rxA: RxStoreA
@@ -12,15 +13,16 @@ export interface RootStore {
   syncA: SyncAStore
   syncB: SyncBStore
   promise: PromiseStore
+  thunk: ThunkStore
 }
 
-const reducer = combineHandlers<RootStore>({
+const handlers = combineHandlers<RootStore>({
   rxA: rxHandler,
   rxB: rxHandler2,
   syncA: syncAHandler,
   syncB: syncBHandler,
-  promise: promiseHandler
+  promise: promiseHandler,
+  thunk: thunkHandler
 })
-  .buildReducer()
 
-export const store = createStore(reducer, applyMiddleware(handlerMiddleware()))
+export const store = createStore(handlers.buildReducer(), applyMiddleware(handlerMiddleware()))

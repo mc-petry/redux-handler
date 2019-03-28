@@ -1,24 +1,26 @@
 # redux-handler
 
-Powerful and simple redux middleware to handle RxJS Observables. Forget about the difficulty with redux. Designed for large projects.
-
-Out of the box handles **RxJS Observable** and **Promise**.
+Powerful :muscle: and simple :point_left: redux middleware to handle async actions.
 
 ## Table of Contents
 
-- [Requirements](#requirements)
 - [Installation](#installation)
 - [Usage](#usage)
-  - [Sync actions](#sync-actions)
-  - [Operators](#operators)
+- [Operators](#operators)
+  - [Main](#main)
+    - [sync](#sync)
     - [rx](#rx)
     - [promise](#promise)
-    - [available](#available)
+    - [thunk](#thunk)
+  - [Async](#async)
     - [pending](#pending)
     - [fulfilled](#fulfilled)
     - [rejected](#rejected)
     - [completed](#completed)
     - [loading](#loading)
+  - [Common](#common)
+    - [available](#available)  
+    
   - [Advanced](#advanced)
     - [Handle action in another handler](#handle-action-in-another-handler)
     - [Redux devtools](#redux-devtools)
@@ -26,14 +28,12 @@ Out of the box handles **RxJS Observable** and **Promise**.
 
 ## Requirements
 
-peer dependencies:
- - redux: ^4
-
-optional dependencies:
- - rxjs: ^6
+peer dependencies: redux: ^4\
+optional dependencies: rxjs: ^6
 
 ## Installation
 
+__store/index.ts__
 ```ts
 // Define your inner stores
 interface RootStore {
@@ -44,12 +44,13 @@ interface RootStore {
 const reducer = combineHandlers<RootStore>({
   inner: innerHandler
 })
-  .buildReducer({
-    // Other reducers if needs
-    // For example: `router: RouterState`
-  })
 
-const store = createStore(reducer, applyMiddleware(handlerMiddleware()))
+const store = createStore(reducer.buildReducer(), applyMiddleware(handlerMiddleware()))
+```
+
+__store/handler.ts__
+```ts
+export const { handler } = create<RootStore>()
 ```
 
 ## Usage
@@ -62,135 +63,129 @@ interface Store {
 }
 
 const myHandler = handler<Store>({ counter: 0 })
-```
 
-### Sync actions
-
-```ts
-const add = myHandler
-  .action() // .action('ACTION_NAME') for explicit name
-  .sync(s => ({ ...s, counter: s.value + 1 }))
-```
-
-#### With args
-
-```ts
-const addCustom = myHandler
-  .action<{ amount: number }>()
-  .sync((s, { args }) => ({ ...s, counter: s.value + args.amount }))
-```
-
-### Operators
-
-<a id="rx"></a>
-
-```ts
-/**
- * Handles rxjs observable.
- */
-rx(fn: (args: A, injects: { getState: () => RootStore, action$: Observable<Action>, type: string }) => Observable)
-```
-
-<a id="promise"></a>
-
-```ts
-/**
- * Handles the promise.
- */
-promise(fn: (args: A, injects: { getState: () => RootStore, type: string }) => PromiseLike<T>) {
-```
-
-<a id="available"></a>
-
-```ts
-/**
- * Prevents calling async operators based on state.
- * Can be used only before main operator such `rx` or `promise`.
- */
-available(fn: (getState: () => RootStore, other: { args: TArgs, type: string })
-```
-
-<a id="pending"></a>
-
-```ts
-/**
- * Occurs before async method is called.
- */
-pending(hr: (state: Readonly<Store>, action: { args: TArgs, type: string }))
-```
-
-<a id="fulfilled"></a>
-
-```ts
-/**
- * Occurs on async method succeeds.
- */
-fulfilled(hr: (state: Readonly<Store>, action: { payload: TPayload, args: TArgs, type: string }))
-```
-
-<a id="rejected"></a>
-
-```ts
-/**
- * Occurs on async method failed.
- */
-rejected(hr: (state: Readonly<Store>, action: { error: any, args: TArgs, type: string }))
-```
-
-<a id="completed"></a>
-
-```ts
-/**
- * Occurs after async method is completed.
- */
-completed(hr: (state: Readonly<Store>, action: { args: TArgs, type: string }))
-```
-
-<a id="loading"></a>
-
-```ts
-/**
- * Sets the property = `true` on pending.
- * Sets the property = `false` on completed.
- */
-loading(prop: keyof S)
-```
-
-### RxJS
-
-```ts
-export const fetchData = myHandler
-  .action()
+// Create action
+const myAction = myHandler
+  .action() // For arguments use `.action<TArgs>`
   .pipe(
-    // Optional `available` operator
-    rx(args => ajax(...)),
-    // Effects operators
+    // Operators
   )
 ```
+
+## Operators
+
+Each pipe must contain single [main](#main) operator
+
+### Main
+
+#### sync
+
+Handles standard action handler.
+Compatible operators: [Common](#common)
+
+```ts
+sync((state, { args, type }) => typeof state)
+```
+
+
+#### rx
+
+Handles rxjs observable.
+Compatible operators: [Common](#common), [Async](#async)
+
+```ts
+rx((args, { action$, getState, type }) => Observable)
+```
+
+
+#### promise
+
+Handles promise.
+Compatible operators: [Common](#common), [Async](#async)
+
+```ts
+promise((args, { getState, type }) => Promise)
+```
+
+
+#### thunk
+
+Handles async dispatch.
+Compatible operators: [Common](#common)
+
+```ts
+thunk({ dispatch, getState, args } => void)
+```
+
+
+### Async
+
+
+#### pending
+
+Occurs before async method is called.
+
+```ts
+pending((state, { args, type }) => void)
+```
+
+
+#### fulfilled
+
+Occurs on async method succeeds.
+
+```ts
+fulfilled((state, { payload, args, type }) => typeof state)
+```
+
+
+#### rejected
+
+Occurs on async method failed.
+
+```ts
+rejected((state, { error, args, type }) => typeof state)
+```
+
+
+#### completed
+
+Occurs after async method is completed.
+
+```ts
+completed((state, { args, type }) => typeof state)
+```
+
+
+#### loading
+
+Sets the property = `true` on pending.
+Sets the property = `false` on completed.
+
+```ts
+loading(prop: keyof state)
+```
+
+
+### Common
+
+#### available
+
+Prevents calling actions based on state.
+Can be used only before main operator.
+
+```ts
+available((getState, { args, type }) => boolean)
+```
+
 
 ### Advanced
 
 #### Handle action in another handler
 
 ```ts
-const h1 = handler<Handler1>()
-const h2 = handler<Handler2>()
-
-const action = h1
-  .action()
-  .sync(...)
-
-const actionAsync = h1
-  .action()
-  .pipe(...)
-
-h2.handle(
-  action,
-  (state, action) => (...)
-)
-
-h2.handle(
-  actionAsync,
+myHandler.handle(
+  myAction,
   // ...operators[]
 )
 ```
@@ -207,7 +202,7 @@ const composeEnhancers: typeof compose = window.__REDUX_DEVTOOLS_EXTENSION_COMPO
 export const store = createStore(reducer, composeEnhancers(...composes))
 ```
 
-### Example
+### Examples
 
 Simple users fetch:
 
@@ -234,7 +229,9 @@ Dispatch another action inside action:
 ```ts
 export const updateUsersBalance = usersHandler
   .action()
-  .sync(s => ({ ...s, balance: s.users.reduce((a, b) => a + b.balance, 0) }))
+  .pipe(
+    sync(s => ({ ...s, balance: s.users.reduce((a, b) => a + b.balance, 0) }))
+  )
 
 export const fetchUsers = usersHandler
   .action()

@@ -33,6 +33,7 @@
       true,
       ["redux-handler", "rxjs"]
     ],
+    "no-object-literal-type-assertion": false,
     "eofline": false,
     "object-literal-sort-keys": false,
     "one-line": [

@@ -52,7 +52,7 @@ function isPromisePut(payload: any): payload is PromisePut {
   return payload && (payload as PromisePut)[PROMISE_PUT] != null
 }
 
-const beforeNext: BeforeNextHook<any> = ({ dispatch, action, options, getState, defaultPrevented }) => {
+const beforeNext: BeforeNextHook<any, InternalAction> = ({ dispatch, action, options, getState, defaultPrevented }) => {
   const meta = action[META_SYM]
   const promiseMeta = (action as Partial<PromiseInternalAction>)[PROMISE_SYM]
 
@@ -112,7 +112,7 @@ const beforeNext: BeforeNextHook<any> = ({ dispatch, action, options, getState, 
 }
 
 /**
- * Handles the promise.
+ * Handles promise.
  */
 export function promise<RS, S, A, T>(fn: PromiseFn<RS, S, A, T>): HOperator<RS, S, A, T, T, any, PromiseAction<T>> {
   return ({

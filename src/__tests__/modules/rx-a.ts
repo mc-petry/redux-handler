@@ -1,9 +1,8 @@
-import { handler } from '../..'
 import { of, concat } from 'rxjs'
-import { pending, fulfilled, rejected, completed, loading, available } from '../../operators'
-import { RootStore } from '../store'
+import { pending, fulfilled, rejected, completed, loading, available, sync } from '../../operators'
 import { tap, takeUntil, filter, delay } from 'rxjs/operators'
 import { rx } from '../../operators/rx'
+import { handler } from '../handler'
 
 export interface RxStoreA {
   pending?: string
@@ -26,7 +25,7 @@ const initialState: RxStoreA = {
   numberOfExecutionsRx: 0
 }
 
-export const rxHandler = handler<RxStoreA, RootStore>(initialState)
+export const rxHandler = handler<RxStoreA>(initialState)
 
 export const baseRx = rxHandler
   .action<{ data?: string, reject?: boolean, notavailable?: string }>()
@@ -68,18 +67,17 @@ export const preventedRx = rxHandler
   )
 
 
-
 // ---------------------------------
 // --- dispatch action in action ---
 // ---------------------------------
 
 export const produceYoghurt = rxHandler
   .action()
-  .sync(s => ({ ...s, yoghurt: s.milk! / 2 }))
+  .pipe(sync(s => ({ ...s, yoghurt: s.milk! / 2 })))
 
 export const produceCheese = rxHandler
   .action()
-  .sync(s => ({ ...s, cheese: s.milk! / 5 }))
+  .pipe(sync(s => ({ ...s, cheese: s.milk! / 5 })))
 
 export const getMilk = rxHandler
   .action()
@@ -96,7 +94,7 @@ export const getMilk = rxHandler
 
 export const incNumberOfExecutionsRx = rxHandler
   .action()
-  .sync(s => ({ ...s, numberOfExecutionsRx: s.numberOfExecutionsRx + 1 }))
+  .pipe(sync(s => ({ ...s, numberOfExecutionsRx: s.numberOfExecutionsRx + 1 })))
 
 export const executeRx = rxHandler
   .action()

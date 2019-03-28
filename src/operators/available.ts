@@ -9,7 +9,10 @@ export function available<RS, S, TArgs, T, A>(fn: (getState: () => RS, other: { 
   return ({
     hooks: {
       beforeNext: ({ action: { [META_SYM]: meta, [ARGS_SYM]: args, type }, getState, preventDefault }) => {
-        if (meta.state === Lifecycle.INIT) {
+        if (
+          (meta.state && meta.state === Lifecycle.INIT) ||
+          !meta.state
+        ) {
           if (!fn(getState, { args, type })) {
             preventDefault()
           }

@@ -1,5 +1,5 @@
-declare const process: {
-  env: {
+declare namespace NodeJS {
+  interface ProcessEnv {
     NODE_ENV: 'production'
   }
 }

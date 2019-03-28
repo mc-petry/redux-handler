@@ -5,7 +5,7 @@ import { Dispatch } from 'redux'
 export const errorHandler = ({ options, error, action, dispatch }: {
   options: MiddlewareOptions | undefined
   dispatch: Dispatch<Action>
-  action: InternalAction
+  action: InternalAction<any>
   error: any
 }) => {
   if (options && options.errorHandler) {

@@ -1,5 +1,6 @@
-import { handler } from '../..'
+import { sync } from '../..'
 import { baseSyncWithArgs } from './sync-a'
+import { handler } from '../handler'
 
 export interface SyncBStore {
   handle?: string
@@ -8,4 +9,4 @@ export interface SyncBStore {
 export const syncBHandler = handler<SyncBStore>({})
 
 export const fromAnother = syncBHandler
-  .handle(baseSyncWithArgs, (s, a) => ({ ...s, handle: a.args.data }))
+  .on(baseSyncWithArgs, sync((s, a) => ({ ...s, handle: a.args.data })))

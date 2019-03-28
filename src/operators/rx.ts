@@ -66,7 +66,7 @@ class RxPlugin implements HandlerPlugin {
 // tslint:disable-next-line:no-empty
 const EMPTY_FN = () => { }
 
-const beforeNext: BeforeNextHook<any> = ({ dispatch, action, options, getState, defaultPrevented }) => {
+const beforeNext: BeforeNextHook<any, InternalAction> = ({ dispatch, action, options, getState, defaultPrevented }) => {
   const meta = action[META_SYM]
   const rxmeta = (action as Partial<RxInternalAction>)[RX_SYM]
 

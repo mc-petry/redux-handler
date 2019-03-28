@@ -27,13 +27,13 @@ export const handlerMiddleware: (options?: Partial<MiddlewareOptions>) => Middle
 
     return <D extends Dispatch, S>({ dispatch, getState }: MiddlewareAPI<D, S>) =>
       (next: Dispatch<Action>) =>
-        (action: InternalAction) => {
+        (action: InternalAction<any>) => {
           const meta = action[META_SYM]
 
           // #region Handle operators before next hooks
 
           if (meta && meta.operators) {
-            const eventArgs: Mutable<HOperatorOnBeforeNextEvent<S>> = {
+            const eventArgs: Mutable<HOperatorOnBeforeNextEvent<S, any>> = {
               action,
               dispatch,
               getState,

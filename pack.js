@@ -3,7 +3,6 @@ const fs = require('fs-extra')
 const distFolder = 'dist'
 
 const package = JSON.parse(fs.readFileSync('package.json'))
-package.types = "index.d.ts"
 
 fs.writeFileSync(`${distFolder}/package.json`, JSON.stringify(package))
 

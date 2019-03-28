@@ -1,4 +1,5 @@
-import { handler } from '../..'
+import { sync } from '../../operators'
+import { handler } from '../handler'
 
 export interface SyncAStore {
   prop?: string
@@ -10,15 +11,15 @@ export const syncAHandler = handler<SyncAStore>({})
 
 export const baseSync = syncAHandler
   .action()
-  .sync(s => ({ ...s, prop: 'green' }))
+  .pipe(sync(s => ({ ...s, prop: 'green' })))
 
 export const baseSyncWithArgs = syncAHandler
   .action<{ data: string }>()
-  .sync((s, a) => ({ ...s, propArg: a.args.data }))
+  .pipe(sync((s, a) => ({ ...s, propArg: a.args.data })))
 
 export const testUnionArgs = syncAHandler
   .action<{ data: string } | { value: string }>()
-  .sync((s, a) => {
+  .pipe(sync((s, a) => {
     const value = ('data' in a.args)
       ? (a.args as { data: string; }).data
       : (a.args as { value: string; }).value
@@ -27,4 +28,4 @@ export const testUnionArgs = syncAHandler
       ...s,
       union: (s.union || '') + value
     })
-  })
+  }))
