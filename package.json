@@ -1,6 +1,6 @@
 {
   "name": "redux-handler",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "description": "Simple and powerful tool for redux effects for medium and large projects",
   "main": "index.js",
   "module": "es6/index.js",
